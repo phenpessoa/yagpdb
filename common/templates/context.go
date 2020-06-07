@@ -153,6 +153,8 @@ type contextFrame struct {
 
 	isNestedTemplate bool
 	parsedTemplate   *template.Template
+	execMode	bool
+	execReturn	 []interface{}
 	SendResponseInDM bool
 }
 
@@ -197,13 +199,13 @@ func (c *Context) setupBaseData() {
 	}
 
 	if c.CurrentFrame.CS != nil {
-		channel := CtxChannelFromCS(c.CurrentFrame.CS)
+		channel := c.CurrentFrame.CS.Copy(false)
 		c.Data["Channel"] = channel
 		c.Data["channel"] = channel
 	}
 
 	if c.MS != nil {
-		c.Data["Member"] = c.MS.DGoCopy()
+		c.Data["Member"] = CtxMemberFromMS(c.MS)
 		c.Data["User"] = c.MS.DGoUser()
 		c.Data["user"] = c.Data["User"]
 	}
@@ -255,7 +257,6 @@ func (c *Context) Execute(source string) (string, error) {
 
 			c.Msg.Member = member.DGoCopy()
 		}
-
 	}
 
 	if c.GS != nil {
@@ -465,6 +466,7 @@ func (c *Context) LogEntry() *logrus.Entry {
 func baseContextFuncs(c *Context) {
 	// message functions
 	c.ContextFuncs["sendDM"] = c.tmplSendDM
+	c.ContextFuncs["sendTargetDM"] = c.tmplSendTargetDM
 	c.ContextFuncs["sendMessage"] = c.tmplSendMessage(true, false)
 	c.ContextFuncs["sendTemplate"] = c.tmplSendTemplate
 	c.ContextFuncs["sendTemplateDM"] = c.tmplSendTemplateDM
@@ -486,7 +488,7 @@ func baseContextFuncs(c *Context) {
 
 	c.ContextFuncs["addRoleID"] = c.tmplAddRoleID
 	c.ContextFuncs["removeRoleID"] = c.tmplRemoveRoleID
-	
+
 	c.ContextFuncs["addRoleName"] = c.tmplAddRoleName
 	c.ContextFuncs["removeRoleName"] = c.tmplRemoveRoleName
 
@@ -525,6 +527,9 @@ func baseContextFuncs(c *Context) {
 	c.ContextFuncs["onlineCount"] = c.tmplOnlineCount
 	c.ContextFuncs["onlineCountBots"] = c.tmplOnlineCountBots
 	c.ContextFuncs["editNickname"] = c.tmplEditNickname
+
+	c.ContextFuncs["execTemplate"] = c.tmplExecTemplate
+	c.ContextFuncs["addReturn"] = c.tmplAddReturn
 }
 
 type limitedWriter struct {
