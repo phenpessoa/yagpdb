@@ -26,25 +26,75 @@ func (c *Context) tmplSendDM(s ...interface{}) string {
 	}
 
 	c.GS.RLock()
-	gName := c.GS.Guild.Name
 	memberID := c.MS.ID
 	c.GS.RUnlock()
 
-	info := fmt.Sprintf("Custom Command DM From the server **%s**", gName)
-
-	// Send embed
-	if embed, ok := s[0].(*discordgo.MessageEmbed); ok {
-		embed.Footer = &discordgo.MessageEmbedFooter{
-			Text: info,
+	msgSend := &discordgo.MessageSend{
+			AllowedMentions: discordgo.AllowedMentions{
+					Parse : []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
+			},
 		}
 
-		bot.SendDMEmbed(memberID, embed)
+	switch t:= s[0].(type) {
+		case *discordgo.MessageEmbed:
+			msgSend.Embed = t
+		case *discordgo.MessageSend:
+			msgSend = t
+			if (strings.TrimSpace(msgSend.Content) == "") && (msgSend.File == nil) {
+				return ""
+			}
+			msgSend.Content = msgSend.Content
+		default:
+			msgSend.Content = fmt.Sprintf("%s", fmt.Sprint(s...))
+	}
+
+	channel, err := common.BotSession.UserChannelCreate(memberID)
+	if err != nil {
+		return ""
+	}
+	_, _ = common.BotSession.ChannelMessageSendComplex(channel.ID, msgSend)
+	return ""
+}
+
+func (c *Context) tmplSendTargetDM(target interface{}, s ...interface{}) string {
+	if len(s) < 1 || c.IncreaseCheckCallCounter("send_dm", 1) || c.MS == nil {
 		return ""
 	}
 
-	msg := fmt.Sprint(s...)
-	msg = fmt.Sprintf("%s\n%s", info, msg)
-	bot.SendDM(memberID, msg)
+	targetID := targetUserID(target)
+	if targetID == 0 {
+		return ""
+	}
+
+	ts, err := bot.GetMember(c.GS.ID, targetID)
+	if err != nil {
+		return ""
+	}
+
+	msgSend := &discordgo.MessageSend{
+			AllowedMentions: discordgo.AllowedMentions{
+					Parse : []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
+			},
+		}
+
+	switch t:= s[0].(type) {
+		case *discordgo.MessageEmbed:
+			msgSend.Embed = t
+		case *discordgo.MessageSend:
+			msgSend = t
+			if (strings.TrimSpace(msgSend.Content) == "") && (msgSend.File == nil) {
+				return ""
+			}
+			msgSend.Content = msgSend.Content
+		default:
+			msgSend.Content = fmt.Sprintf("%s", fmt.Sprint(s...))
+	}
+
+	channel, err := common.BotSession.UserChannelCreate(ts.ID)
+	if err != nil {
+		return ""
+	}
+	_, _ = common.BotSession.ChannelMessageSendComplex(channel.ID, msgSend)
 	return ""
 }
 
@@ -157,14 +207,18 @@ func (c *Context) ChannelArgNoDM(v interface{}) int64 {
 }
 
 func (c *Context) tmplSendTemplateDM(name string, data ...interface{}) (interface{}, error) {
-	return c.sendNestedTemplate(nil, true, name, data...)
+	return c.sendNestedTemplate(nil, true, false, name, data...)
 }
 
 func (c *Context) tmplSendTemplate(channel interface{}, name string, data ...interface{}) (interface{}, error) {
-	return c.sendNestedTemplate(channel, false, name, data...)
+	return c.sendNestedTemplate(channel, false, false, name, data...)
 }
 
-func (c *Context) sendNestedTemplate(channel interface{}, dm bool, name string, data ...interface{}) (interface{}, error) {
+func (c *Context) tmplExecTemplate(channel interface{}, name string, data ...interface{}) (interface{}, error) {
+	return c.sendNestedTemplate(channel, false, true, name, data...)
+}
+
+func (c *Context) sendNestedTemplate(channel interface{}, dm , exec bool, name string, data ...interface{}) (interface{}, error) {
 	if c.IncreaseCheckCallCounter("exec_child", 3) {
 		return "", ErrTooManyCalls
 	}
@@ -227,6 +281,7 @@ func (c *Context) sendNestedTemplate(channel interface{}, dm bool, name string, 
 		c.CurrentFrame.SendResponseInDM = oldFrame.SendResponseInDM
 	}
 
+	c.CurrentFrame.execMode = exec
 	// pass some data
 	if len(data) > 1 {
 		c.Data["TemplateArgs"], _ = Dictionary(data...)
@@ -241,6 +296,13 @@ func (c *Context) sendNestedTemplate(channel interface{}, dm bool, name string, 
 		return "", err
 	}
 
+	if exec {
+		var execReturnStruct CtxExecReturn
+		execReturnStruct.Response = c.MessageSend(resp)
+		execReturnStruct.Return = c.CurrentFrame.execReturn
+		return execReturnStruct, err
+	}
+
 	m, err := c.SendResponse(resp)
 	if err != nil {
 		return "", err
@@ -250,6 +312,19 @@ func (c *Context) sendNestedTemplate(channel interface{}, dm bool, name string, 
 		return m.ID, err
 	}
 	return "", err
+}
+
+func (c* Context) tmplAddReturn(data...interface{}) (interface{} ,error) {
+	if !c.CurrentFrame.isNestedTemplate || !c.CurrentFrame.execMode {
+		return "", errors.New("Can only be used in nested templates in exec mode.")
+	}
+
+	if len(c.CurrentFrame.execReturn) + len (data) > 10 {
+		return "", errors.New("Return length cannot exceed 10")
+	}
+
+	c.CurrentFrame.execReturn = append(c.CurrentFrame.execReturn, data...)
+	return "", nil
 }
 
 func (c *Context) tmplSendMessage(filterSpecialMentions bool, returnID bool) func(channel interface{}, msg interface{}) interface{} {
@@ -282,8 +357,8 @@ func (c *Context) tmplSendMessage(filterSpecialMentions bool, returnID bool) fun
 			msgSend.Embed = typedMsg
 		case *discordgo.MessageSend:
 			msgSend = typedMsg
-			msgSend.AllowedMentions = discordgo.AllowedMentions{
-				Parse: parseMentions,
+			if !filterSpecialMentions {
+				msgSend.AllowedMentions = discordgo.AllowedMentions{Parse: parseMentions,}
 			}
 		default:
 			msgSend.Content = fmt.Sprint(msg)
@@ -328,9 +403,16 @@ func (c *Context) tmplEditMessage(filterSpecialMentions bool) func(channel inter
 			}
 			msgEdit.Content = typedMsg.Content
 			msgEdit.Embed = typedMsg.Embed
+			msgEdit.AllowedMentions = typedMsg.AllowedMentions
 		default:
 			temp := fmt.Sprint(msg)
 			msgEdit.Content = &temp
+		}
+
+		if !filterSpecialMentions {
+			msgEdit.AllowedMentions = &discordgo.AllowedMentions {
+							Parse: []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers, discordgo.AllowedMentionTypeRoles, discordgo.AllowedMentionTypeEveryone},
+						  }
 		}
 
 		_, err = common.BotSession.ChannelMessageEditComplex(msgEdit)
@@ -724,7 +806,7 @@ func (c *Context) tmplAddRoleName(name string) (string, error) {
     c.GS.RLock()
     for _, r := range c.GS.Guild.Roles {
         if strings.EqualFold(r.Name, name) {
-            role = r.ID    
+            role = r.ID
             break
         }
     }
@@ -737,7 +819,7 @@ func (c *Context) tmplAddRoleName(name string) (string, error) {
     if err := common.AddRoleDS(c.MS, role); err != nil {
         return "", err
     }
-    
+
     return "", nil
 }
 
@@ -924,7 +1006,7 @@ func (c *Context) tmplGetMessage(channel, msgID interface{}) (*discordgo.Message
 	return message, nil
 }
 
-func (c *Context) tmplGetMember(target interface{}) (*discordgo.Member, error) {
+func (c *Context) tmplGetMember(target interface{}) (*CtxMember, error) {
 	if c.IncreaseCheckGenericAPICall() {
 		return nil, ErrTooManyAPICalls
 	}
@@ -939,7 +1021,7 @@ func (c *Context) tmplGetMember(target interface{}) (*discordgo.Member, error) {
 		return nil, nil
 	}
 
-	return member.DGoCopy(), nil
+	return CtxMemberFromMS(member), nil
 }
 
 func (c *Context) tmplGetChannel(channel interface{}) (*CtxChannel, error) {
@@ -960,6 +1042,7 @@ func (c *Context) tmplGetChannel(channel interface{}) (*CtxChannel, error) {
 	}
 
 	return CtxChannelFromCS(cstate), nil
+
 }
 
 func (c *Context) tmplAddReactions(values ...reflect.Value) (reflect.Value, error) {
