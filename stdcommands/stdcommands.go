@@ -47,6 +47,9 @@ import (
 	"github.com/jonas747/yagpdb/stdcommands/wouldyourather"
 	"github.com/jonas747/yagpdb/stdcommands/xkcd"
 	"github.com/jonas747/yagpdb/stdcommands/yagstatus"
+	"github.com/jonas747/yagpdb/stdcommands/editrole"
+	"github.com/jonas747/yagpdb/stdcommands/tibiachars"
+	"github.com/jonas747/yagpdb/stdcommands/tibianews"
 )
 
 var (
@@ -85,6 +88,7 @@ func (p *Plugin) AddCommands() {
 		simpleembed.Command,
 		currenttime.Command,
 		mentionrole.Command,
+		editrole.Command,
 		listroles.Command,
 		wouldyourather.Command,
 		poll.Command,
@@ -92,6 +96,15 @@ func (p *Plugin) AddCommands() {
 		viewperms.Command,
 		topgames.Command,
 		xkcd.Command,
+
+		//Tibia
+			//Chars
+			tibiachars.MainCharCommand,
+			tibiachars.DeathsCommand,
+
+			//News
+			tibianews.NewsCommand,
+			tibianews.NewsTickerCommand,
 
 		// Maintenance
 		stateinfo.Command,
