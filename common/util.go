@@ -124,19 +124,19 @@ const (
 func (d DurationFormatPrecision) String() string {
 	switch d {
 	case DurationPrecisionSeconds:
-		return "second"
+		return "segundo"
 	case DurationPrecisionMinutes:
-		return "minute"
+		return "minuto"
 	case DurationPrecisionHours:
-		return "hour"
+		return "hora"
 	case DurationPrecisionDays:
-		return "day"
+		return "dia"
 	case DurationPrecisionWeeks:
-		return "week"
+		return "semana"
 	case DurationPrecisionYears:
-		return "year"
+		return "ano"
 	}
-	return "Unknown"
+	return "Desconhecido"
 }
 
 func (d DurationFormatPrecision) FromSeconds(in int64) int64 {
@@ -315,28 +315,28 @@ func RemoveRoleDS(ms *dstate.MemberState, role int64) error {
 }
 
 var StringPerms = map[int]string{
-	discordgo.PermissionReadMessages:       "Read Messages",
-	discordgo.PermissionSendMessages:       "Send Messages",
-	discordgo.PermissionSendTTSMessages:    "Send TTS Messages",
-	discordgo.PermissionManageMessages:     "Manage Messages",
-	discordgo.PermissionEmbedLinks:         "Embed Links",
-	discordgo.PermissionAttachFiles:        "Attach Files",
-	discordgo.PermissionReadMessageHistory: "Read Message History",
-	discordgo.PermissionMentionEveryone:    "Mention Everyone",
-	discordgo.PermissionVoiceConnect:       "Voice Connect",
-	discordgo.PermissionVoiceSpeak:         "Voice Speak",
-	discordgo.PermissionVoiceMuteMembers:   "Voice Mute Members",
-	discordgo.PermissionVoiceDeafenMembers: "Voice Deafen Members",
-	discordgo.PermissionVoiceMoveMembers:   "Voice Move Members",
-	discordgo.PermissionVoiceUseVAD:        "Voice Use VAD",
+	discordgo.PermissionReadMessages:       "Ler Mensagens",
+	discordgo.PermissionSendMessages:       "Enviar Mensagens",
+	discordgo.PermissionSendTTSMessages:    "Enviar Mensagens TTS",
+	discordgo.PermissionManageMessages:     "Gerenciar Mensagens",
+	discordgo.PermissionEmbedLinks:         "Links com Embeds",
+	discordgo.PermissionAttachFiles:        "Anexar Arquivos",
+	discordgo.PermissionReadMessageHistory: "Ler Histórico de Mensagens",
+	discordgo.PermissionMentionEveryone:    "Mencionar Everyone",
+	discordgo.PermissionVoiceConnect:       "Conectar à Voz",
+	discordgo.PermissionVoiceSpeak:         "Falar",
+	discordgo.PermissionVoiceMuteMembers:   "Silenciar Voz de Membros",
+	discordgo.PermissionVoiceDeafenMembers: "Ensurdecer Membros",
+	discordgo.PermissionVoiceMoveMembers:   "Mover Membros",
+	discordgo.PermissionVoiceUseVAD:        "Usar VAD",
 
-	discordgo.PermissionCreateInstantInvite: "Create Instant Invite",
-	discordgo.PermissionKickMembers:         "Kick Members",
-	discordgo.PermissionBanMembers:          "Ban Members",
-	discordgo.PermissionManageRoles:         "Manage Roles",
-	discordgo.PermissionManageChannels:      "Manage Channels",
-	discordgo.PermissionManageServer:        "Manage Server",
-	discordgo.PermissionManageWebhooks:      "Manage Webhooks",
+	discordgo.PermissionCreateInstantInvite: "Criar Convites",
+	discordgo.PermissionKickMembers:         "Expulsar Membros",
+	discordgo.PermissionBanMembers:          "Banir Membros",
+	discordgo.PermissionManageRoles:         "Gerenciar Cargos",
+	discordgo.PermissionManageChannels:      "Gerenciar Canais",
+	discordgo.PermissionManageServer:        "Gerenciar Servidor",
+	discordgo.PermissionManageWebhooks:      "Gerenciar Webhooks",
 }
 
 func ErrWithCaller(err error) error {
@@ -397,94 +397,93 @@ func (l LoggedExecutedCommand) TableName() string {
 
 func HumanizePermissions(perms int64) (res []string) {
 	if perms&discordgo.PermissionAdministrator == discordgo.PermissionAdministrator {
-		res = append(res, "Administrator")
+		res = append(res, "Administrador")
 	}
 	if perms&discordgo.PermissionManageServer == discordgo.PermissionManageServer {
-		res = append(res, "ManageServer")
+		res = append(res, "Gerenciar o Servidor")
 	}
-
 	if perms&discordgo.PermissionReadMessages == discordgo.PermissionReadMessages {
-		res = append(res, "ReadMessages")
+		res = append(res, "Ler Mensagens")
 	}
 	if perms&discordgo.PermissionSendMessages == discordgo.PermissionSendMessages {
-		res = append(res, "SendMessages")
+		res = append(res, "Enviar Mensagens")
 	}
 	if perms&discordgo.PermissionSendTTSMessages == discordgo.PermissionSendTTSMessages {
-		res = append(res, "SendTTSMessages")
+		res = append(res, "Enviar Mensagens TTS")
 	}
 	if perms&discordgo.PermissionManageMessages == discordgo.PermissionManageMessages {
-		res = append(res, "ManageMessages")
+		res = append(res, "Gerenciar Mensagens")
 	}
 	if perms&discordgo.PermissionEmbedLinks == discordgo.PermissionEmbedLinks {
-		res = append(res, "EmbedLinks")
+		res = append(res, "Links com Embeds")
 	}
 	if perms&discordgo.PermissionAttachFiles == discordgo.PermissionAttachFiles {
-		res = append(res, "AttachFiles")
+		res = append(res, "Anexar Arquivos")
 	}
 	if perms&discordgo.PermissionReadMessageHistory == discordgo.PermissionReadMessageHistory {
-		res = append(res, "ReadMessageHistory")
+		res = append(res, "Ler Histórico de Mensagens")
 	}
 	if perms&discordgo.PermissionMentionEveryone == discordgo.PermissionMentionEveryone {
-		res = append(res, "MentionEveryone")
+		res = append(res, "Mencionar Everyone")
 	}
 	if perms&discordgo.PermissionUseExternalEmojis == discordgo.PermissionUseExternalEmojis {
-		res = append(res, "UseExternalEmojis")
+		res = append(res, "Usar Emojis Externos")
 	}
 
 	// Constants for the different bit offsets of voice permissions
 	if perms&discordgo.PermissionVoiceConnect == discordgo.PermissionVoiceConnect {
-		res = append(res, "VoiceConnect")
+		res = append(res, "Conectar à Voz")
 	}
 	if perms&discordgo.PermissionVoiceSpeak == discordgo.PermissionVoiceSpeak {
-		res = append(res, "VoiceSpeak")
+		res = append(res, "Falar")
 	}
 	if perms&discordgo.PermissionVoiceMuteMembers == discordgo.PermissionVoiceMuteMembers {
-		res = append(res, "VoiceMuteMembers")
+		res = append(res, "Silenciar Voz de Membros")
 	}
 	if perms&discordgo.PermissionVoiceDeafenMembers == discordgo.PermissionVoiceDeafenMembers {
-		res = append(res, "VoiceDeafenMembers")
+		res = append(res, "Ensurdecer Membros")
 	}
 	if perms&discordgo.PermissionVoiceMoveMembers == discordgo.PermissionVoiceMoveMembers {
-		res = append(res, "VoiceMoveMembers")
+		res = append(res, "Mover Membros")
 	}
 	if perms&discordgo.PermissionVoiceUseVAD == discordgo.PermissionVoiceUseVAD {
-		res = append(res, "VoiceUseVAD")
+		res = append(res, "Usar VAD")
 	}
 
 	// Constants for general management.
 	if perms&discordgo.PermissionChangeNickname == discordgo.PermissionChangeNickname {
-		res = append(res, "ChangeNickname")
+		res = append(res, "Mudar Apelido")
 	}
 	if perms&discordgo.PermissionManageNicknames == discordgo.PermissionManageNicknames {
-		res = append(res, "ManageNicknames")
+		res = append(res, "Gerenciar Apelidos")
 	}
 	if perms&discordgo.PermissionManageRoles == discordgo.PermissionManageRoles {
-		res = append(res, "ManageRoles")
+		res = append(res, "Gerenciar Cargos")
 	}
 	if perms&discordgo.PermissionManageWebhooks == discordgo.PermissionManageWebhooks {
-		res = append(res, "ManageWebhooks")
+		res = append(res, "Gerenciar Webhooks")
 	}
 	if perms&discordgo.PermissionManageEmojis == discordgo.PermissionManageEmojis {
-		res = append(res, "ManageEmojis")
+		res = append(res, "Gerenciar Emojis")
 	}
 
 	if perms&discordgo.PermissionCreateInstantInvite == discordgo.PermissionCreateInstantInvite {
-		res = append(res, "CreateInstantInvite")
+		res = append(res, "Criar Convite")
 	}
 	if perms&discordgo.PermissionKickMembers == discordgo.PermissionKickMembers {
-		res = append(res, "KickMembers")
+		res = append(res, "Expulsar Membros")
 	}
 	if perms&discordgo.PermissionBanMembers == discordgo.PermissionBanMembers {
-		res = append(res, "BanMembers")
+		res = append(res, "Banir Membros")
 	}
 	if perms&discordgo.PermissionManageChannels == discordgo.PermissionManageChannels {
-		res = append(res, "ManageChannels")
+		res = append(res, "Gerenciar Canais")
 	}
 	if perms&discordgo.PermissionAddReactions == discordgo.PermissionAddReactions {
-		res = append(res, "AddReactions")
+		res = append(res, "Adicionar Reações")
 	}
 	if perms&discordgo.PermissionViewAuditLogs == discordgo.PermissionViewAuditLogs {
-		res = append(res, "ViewAuditLogs")
+		res = append(res, "Ver Registro de Auditoria")
 	}
 
 	return
