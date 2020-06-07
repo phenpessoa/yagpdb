@@ -51,6 +51,15 @@ type Config struct {
 	WarnSendToModlog       bool
 	WarnMessage            string `valid:"template,5000"`
 
+	//Lockdown
+	LockdownCmdEnabled 		bool
+	LockdownCmdModlog  		bool
+	LockdownCmdRoles   		pq.Int64Array `gorm:"type:bigint[]" valid:"role,true"`
+	DefaultLockRole			string        `valid:"role,true"`
+	LockIncludeChannelLogs	bool
+	LockHasResponse			bool
+	DefaultLockdownDuration sql.NullInt64 `gorm:"default:0"`
+
 	// Misc
 	CleanEnabled  bool
 	ReportEnabled bool
@@ -135,4 +144,20 @@ type MuteModel struct {
 
 func (m *MuteModel) TableName() string {
 	return "muted_users"
+}
+
+type LockdownModel struct {
+	common.SmallModel
+
+	ExpiresAt time.Time
+	GuildID int64 `gorm:"index"`
+	RoleID  int64
+
+	PermsOriginal int64
+	PermsToggle   int64
+	Overwrite     bool
+}
+
+func (m *LockdownModel) TableName() string {
+	return "locked_roles"
 }
