@@ -2,6 +2,7 @@ package moderation
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -68,7 +69,7 @@ func punish(config *Config, p Punishment, guildID int64, channel *dstate.Channel
 	} else {
 		action = MABanned
 		if duration > 0 {
-			action.Footer = "Expires after: " + common.HumanizeDuration(common.DurationPrecisionMinutes, duration)
+			action.Footer = "Expira em: " + common.HumanizeDuration(common.DurationPrecisionMinutes, duration)
 		}
 	}
 
@@ -113,7 +114,7 @@ func punish(config *Config, p Punishment, guildID int64, channel *dstate.Channel
 		return err
 	}
 
-	logger.Infof("MODERATION: %s %s %s cause %q", author.Username, action.Prefix, user.Username, reason)
+	logger.Infof("MODERAÇÃO: %s %s %s causa %q", author.Username, action.Prefix, user.Username, reason)
 
 	if memberNotFound {
 		// Wait a tiny bit to make sure the audit log is updated
@@ -166,7 +167,7 @@ func sendPunishDM(config *Config, dmMsg string, action ModlogAction, gs *dstate.
 	ctx.Data["Message"] = message
 
 	if duration < 1 {
-		ctx.Data["HumanDuration"] = "permanently"
+		ctx.Data["HumanDuration"] = "permanentemente"
 	}
 
 	executed, err := ctx.Execute(dmMsg)
@@ -273,6 +274,206 @@ func BanUserWithDuration(config *Config, guildID int64, channel *dstate.ChannelS
 func BanUser(config *Config, guildID int64, channel *dstate.ChannelState, message *discordgo.Message, author *discordgo.User, reason string, user *discordgo.User) error {
 	return BanUserWithDuration(config, guildID, channel, message, author, reason, user, 0, 1)
 }
+
+
+func LockUnlockRole (config *Config, lock bool, gs *dstate.GuildState, channel *dstate.ChannelState, authorMember *dstate.MemberState, modlogAuthor *discordgo.User, reason, roleS string,  force bool, totalPerms int, dur time.Duration) (interface{}, error) {
+	config, err := getConfigIfNotSet(gs.ID, config)
+	if err != nil {
+		return nil, common.ErrWithCaller(err)
+	}
+
+	if roleS == "" {
+		if config.DefaultLockRole == "" {
+			roleS = "@everyone"
+		} else {
+			roleS = config.DefaultLockRole
+		}
+	}
+	role := FindRole(gs, roleS)
+
+	if role == nil {
+		return  "No role with the Name or ID `" + roleS + "` found.", nil
+	}
+
+	gs.RLock()
+	if !bot.IsMemberAboveRole(gs, authorMember, role) {
+		gs.RUnlock()
+		return  "You can't lock/unlock roles above you.", nil
+	}
+	gs.RUnlock()
+
+	if dur > 0 && dur < time.Minute {
+		dur = time.Minute
+	}
+
+	var channelID int64
+	if channel != nil {
+		channelID = channel.ID
+	}
+
+	logLink := ""
+	if config.LockIncludeChannelLogs && channelID != 0 {
+		logLink = CreateLogs(gs.ID, channelID, modlogAuthor)
+	}
+
+	// To avoid unexpected things from happening, make sure were only updating the lockdown of the role 1 place at a time
+	LockLockdown(role.ID)
+	defer UnlockLockdown(role.ID)
+
+	// Look for existing lockdown
+	currentLockdown := LockdownModel{}
+	err = common.GORM.Where(&LockdownModel{RoleID: role.ID, GuildID: gs.ID}).First(&currentLockdown).Error
+	alreadyLocked := err != gorm.ErrRecordNotFound
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, common.ErrWithCaller(err)
+	}
+
+	var newPerms int
+	action := MAUnlock
+	outDur := ""
+	outPerms := ""
+	if !alreadyLocked {
+		currentLockdown.GuildID = gs.ID
+		currentLockdown.RoleID = role.ID
+		currentLockdown.PermsOriginal = int64(role.Permissions)
+	}
+
+	// remove all existing unlock events for this role irrespective of lock or unlock event
+	_, err = seventsmodels.ScheduledEvents(
+	qm.Where("event_name='moderation_unlock_role'"),
+	qm.Where("guild_id = ?", gs.ID),
+	qm.Where("(data->>'role_id')::bigint = ?", role.ID),
+	qm.Where("processed = false")).DeleteAll(context.Background(), common.PQ)
+
+
+	if lock {
+		currentLockdown.PermsToggle = int64(totalPerms)
+		currentLockdown.Overwrite = force
+		newPerms = role.Permissions&^totalPerms
+		action = MALock
+		outDur = "permanentemente!"
+		action.Footer = "Duração: Permanente"
+		if dur > 0 {
+			humandur := common.HumanizeDuration(common.DurationPrecisionMinutes, dur)
+			outDur = "por `" + humandur + "`!"
+			action.Footer = "Duração: " + humandur
+			currentLockdown.ExpiresAt = time.Now().Add(dur)
+		}
+		err = common.GORM.Save(&currentLockdown).Error
+		if err != nil {
+			return nil, errors.WithMessage(err, "failed inserting/updating lockdown")
+		}
+		reason = reason + "\nPermissões atualmente bloqueadas - `" + strings.Join(common.HumanizePermissions(int64(totalPerms)), ", ") + "`" + "\nForce unlock flag - `" + fmt.Sprint(force) + "`"
+
+	} else {
+
+		if totalPerms == 0 { //This happens during scheduled Unlock events
+			totalPerms = int(currentLockdown.PermsToggle)
+			force = currentLockdown.Overwrite
+		}
+		if force {
+			newPerms = role.Permissions|totalPerms
+		} else {
+			newPerms = role.Permissions|(int(currentLockdown.PermsOriginal)&totalPerms)
+		}
+	}
+
+	if newPerms != role.Permissions { //Update only if permissions change
+		_, err = common.BotSession.GuildRoleEdit(gs.ID, role.ID, role.Name, role.Color, role.Hoist, newPerms, role.Mentionable)
+		if err != nil {
+			return nil, err
+		}
+		toggledPerms := newPerms&^role.Permissions
+		if lock {
+			toggledPerms = role.Permissions&^newPerms
+		}
+		outPerms = "\nPermissões afetadas - `" + strings.Join(common.HumanizePermissions(int64(toggledPerms)), ", ") + "`"
+	}
+	reason = reason + outPerms
+
+
+	if dur > 0 && lock {
+		//schedule new unlock
+		err = scheduledevents2.ScheduleEvent("moderation_unlock_role", gs.ID, time.Now().Add(dur), &ScheduledUnlockData{
+		      RoleID:  role.ID,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !lock && alreadyLocked {
+		common.GORM.Delete(&currentLockdown)
+	}
+
+	if config.LockdownCmdModlog {
+		err = CreateModlogEmbed(config, modlogAuthor, action, role, reason, logLink)
+	}
+	out := role.Name
+	if out == "@everyone" {
+		out = "Server"
+	}
+
+	if config.LockHasResponse {
+		return fmt.Sprintf("%s **%s** agora está **%s** %s\nCargo afetado: %s  -  ID: `%d`%s",action.Emoji, out, action.Prefix, outDur, role.Name, role.ID, outPerms), err
+	}
+
+	return nil, err
+
+}
+
+func UnbanUser(config *Config, guildID int64, author *discordgo.User, reason string, user *discordgo.User) (bool, error) {
+	config, err := getConfigIfNotSet(guildID, config)
+	if err != nil {
+		return false, common.ErrWithCaller(err)
+	}
+	action := MAUnbanned
+
+	//Delete all future Unban Events
+	_, err = seventsmodels.ScheduledEvents(qm.Where("event_name='moderation_unban' AND  guild_id = ? AND (data->>'user_id')::bigint = ?", guildID, user.ID)).DeleteAll(context.Background(), common.PQ)
+	common.LogIgnoreError(err, "[moderation] failed clearing unban events", nil)
+
+	//We need details for user only if unban is to be logged in modlog. Thus we can save a potential api call by directly attempting an unban in other cases.
+	if config.LogUnbans && config.IntActionChannel() != 0 {
+		// check if they're already banned
+		guildBan, err := common.BotSession.GuildBan(guildID, user.ID)
+		if err != nil {
+			notbanned, err := checkErr(err)
+			return notbanned, err
+		}
+		user = guildBan.User
+	}
+
+	// Set a key in redis that marks that this user has appeared in the modlog already
+	common.RedisPool.Do(radix.FlatCmd(nil, "SETEX", RedisKeyUnbannedUser(guildID, user.ID), 30, 2))
+
+	err = common.BotSession.GuildBanDelete(guildID, user.ID)
+	if err != nil {
+		notbanned, err := checkErr(err)
+		return notbanned, err
+	}
+
+	logger.Infof("MODERATION: %s %s %s cause %q", author.Username, action.Prefix, user.Username, reason)
+
+	//modLog Entry handling
+	if config.LogUnbans {
+		err = CreateModlogEmbed(config, author, action, user, reason, "")
+	}
+	return false, err
+}
+
+func checkErr (err error) (bool, error) {
+	if err != nil {
+		if cast, ok := err.(*discordgo.RESTError); ok && cast.Response != nil {
+			if cast.Response.StatusCode == 404 {
+				return true, nil // Not found
+			}
+		}
+		return false, err
+	}
+	return false, nil
+}
+
 
 const (
 	ErrNoMuteRole = errors.Sentinel("No mute role")
