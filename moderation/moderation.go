@@ -24,8 +24,8 @@ type Plugin struct{}
 
 func (p *Plugin) PluginInfo() *common.PluginInfo {
 	return &common.PluginInfo{
-		Name:     "Moderation",
-		SysName:  "moderation",
+		Name:     "Moderação",
+		SysName:  "moderação",
 		Category: common.PluginCategoryModeration,
 	}
 }
@@ -52,7 +52,7 @@ func RegisterPlugin() {
 	common.RegisterPlugin(plugin)
 
 	configstore.RegisterConfig(configstore.SQL, &Config{})
-	common.GORM.AutoMigrate(&Config{}, &WarningModel{}, &MuteModel{})
+	common.GORM.AutoMigrate(&Config{}, &WarningModel{}, &MuteModel{}, &LockdownModel{})
 }
 
 func getConfigIfNotSet(guildID int64, config *Config) (*Config, error) {
