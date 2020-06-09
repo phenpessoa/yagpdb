@@ -101,6 +101,7 @@ func (p *Plugin) AddCommands() {
 			//Chars
 			tibiachars.MainCharCommand,
 			tibiachars.DeathsCommand,
+			tibiachars.CheckOnlineCommand,
 
 			//News
 			tibianews.NewsCommand,
