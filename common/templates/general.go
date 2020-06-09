@@ -37,18 +37,7 @@ func Dictionary(values ...interface{}) (Dict, error) {
 			iter := val.MapRange()
 			mapCopy := make(map[interface{}]interface{})
 			for iter.Next() {
-
-				key, isNil := indirect(iter.Key())
-				if isNil {
-					return nil, errors.New("map with nil key encountered")
-				}
-				if key.Kind() == reflect.Interface {
-					mapCopy[key.Interface()] = iter.Value().Interface()
-				} else if key.Kind() == reflect.Int64 {
-					mapCopy[key.Interface()] = iter.Value().Interface()
-				} else {
-					return nil, errors.New("map has non int key of type: " + key.Type().String())
-				}
+				mapCopy[iter.Key().Interface()] = iter.Value().Interface()
 			}
 			return Dict(mapCopy), nil
 		default:
