@@ -377,6 +377,72 @@ var DeathsCommand = &commands.YAGCommand{
 	},
 }
 
+var CheckOnlineCommand = &commands.YAGCommand{
+	CmdCategory: commands.CategoryFun,
+	Name:        "CheckOnline",
+	Description: "Mostra quem está online no mundo especificado.",
+	Aliases:		[]string{"co"},
+	Arguments: []*dcmd.ArgDef{
+		&dcmd.ArgDef{Name: "Nome do Mundo", Type: dcmd.String},
+	},
+	RunFunc: func(data *dcmd.Data) (interface{}, error) {
+
+		mundo := data.Args[0].Str()
+
+		world, err := getWorld(mundo)
+		if err != nil {
+			if len(mundo) <= 0 {
+				return "Você tem que especificar um mundo.", err
+			} else {
+				return "Algo deu errado ao pesquisar esse char.", err
+			}
+		} else {
+			if len(world.World.WorldInformation.CreationDate) == 0 {
+				return "Esse mundo não existe.", err
+			}
+		}
+
+		if data.Source == dcmd.DMSource {
+			m := make([]map[string]interface{}, len(world.World.PlayersOnline))
+			for k, v := range world.World.PlayersOnline {
+				m[k] = make(map[string]interface{})
+				m[k]["Name"] = v.Name
+				m[k]["Level"] = v.Level
+				m[k]["Vocation"] = v.Vocation
+			}
+			return m, nil
+		}
+
+		desc := ""
+
+		if len(world.World.PlayersOnline) > 0 {
+			for _, v := range world.World.PlayersOnline {
+				checkEnd, _ := regexp.MatchString(`e outros.`, desc)
+				if len(desc) < 1948 {
+					desc += fmt.Sprintf("%s, ", v.Name)
+				} else {
+					if !checkEnd {
+						desc += "e outros."
+					}
+				}
+			}
+			re := regexp.MustCompile(`, \z`)
+			desc = re.ReplaceAllString(desc, ".")
+		} else {
+			desc = "Nenhum player online."
+		}
+
+		embed := &discordgo.MessageEmbed{
+			Title: fmt.Sprintf("Players online em %s", world.World.WorldInformation.Name),
+			Description: desc,
+			Color: int(rand.Int63n(16777215)),
+		}
+
+		return embed, nil
+
+	},
+}
+
 func (ai *ActInfo) UnmarshalJSON(data []byte) error {
 	if bytes.HasPrefix(data, []byte("{")) {
 		type actInfoNoMethods ActInfo
