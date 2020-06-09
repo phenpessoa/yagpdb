@@ -394,7 +394,7 @@ var CheckOnlineCommand = &commands.YAGCommand{
 			if len(mundo) <= 0 {
 				return "Você tem que especificar um mundo.", err
 			} else {
-				return "Algo deu errado ao pesquisar esse char.", err
+				return "Algo deu errado ao pesquisar esse mundo.", err
 			}
 		} else {
 			if len(world.World.WorldInformation.CreationDate) == 0 {
