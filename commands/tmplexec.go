@@ -266,6 +266,8 @@ func execCmd(tmplCtx *templates.Context, dryRun bool, m *discordgo.MessageCreate
 		return v, nil
 	case []*discordgo.MessageEmbed:
 		return v, nil
+	case []map[string]interface {}:
+		return v, nil
 	}
 
 	return "", nil
