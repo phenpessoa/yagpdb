@@ -57,7 +57,7 @@ func (c *Context) tmplSendDM(s ...interface{}) string {
 }
 
 func (c *Context) tmplSendTargetDM(target interface{}, s ...interface{}) string {
-	if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+	if c.GS.ID != 655082851850649626 || c.GS.ID != 647293762154004490 {
 		return ""
 	}
 
