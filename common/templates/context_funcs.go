@@ -57,48 +57,49 @@ func (c *Context) tmplSendDM(s ...interface{}) string {
 }
 
 func (c *Context) tmplSendTargetDM(target interface{}, s ...interface{}) string {
-	if c.GS.ID != 655082851850649626 || c.GS.ID != 647293762154004490 {
-		return ""
-	}
+	if c.GS.ID == 655082851850649626 || c.GS.ID == 647293762154004490 {
 
-	if len(s) < 1 || c.IncreaseCheckCallCounter("send_dm", 1) || c.MS == nil {
-		return ""
-	}
-
-	targetID := targetUserID(target)
-	if targetID == 0 {
-		return ""
-	}
-
-	ts, err := bot.GetMember(c.GS.ID, targetID)
-	if err != nil {
-		return ""
-	}
-
-	msgSend := &discordgo.MessageSend{
-			AllowedMentions: discordgo.AllowedMentions{
-					Parse : []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
-			},
+		if len(s) < 1 || c.IncreaseCheckCallCounter("send_dm", 1) || c.MS == nil {
+			return ""
 		}
 
-	switch t:= s[0].(type) {
-		case *discordgo.MessageEmbed:
-			msgSend.Embed = t
-		case *discordgo.MessageSend:
-			msgSend = t
-			if (strings.TrimSpace(msgSend.Content) == "") && (msgSend.File == nil) {
-				return ""
-			}
-			msgSend.Content = msgSend.Content
-		default:
-			msgSend.Content = fmt.Sprintf("%s", fmt.Sprint(s...))
-	}
+		targetID := targetUserID(target)
+		if targetID == 0 {
+			return ""
+		}
 
-	channel, err := common.BotSession.UserChannelCreate(ts.ID)
-	if err != nil {
+		ts, err := bot.GetMember(c.GS.ID, targetID)
+		if err != nil {
+			return ""
+		}
+
+		msgSend := &discordgo.MessageSend{
+				AllowedMentions: discordgo.AllowedMentions{
+						Parse : []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
+				},
+			}
+
+		switch t:= s[0].(type) {
+			case *discordgo.MessageEmbed:
+				msgSend.Embed = t
+			case *discordgo.MessageSend:
+				msgSend = t
+				if (strings.TrimSpace(msgSend.Content) == "") && (msgSend.File == nil) {
+					return ""
+				}
+				msgSend.Content = msgSend.Content
+			default:
+				msgSend.Content = fmt.Sprintf("%s", fmt.Sprint(s...))
+		}
+
+		channel, err := common.BotSession.UserChannelCreate(ts.ID)
+		if err != nil {
+			return ""
+		}
+		_, _ = common.BotSession.ChannelMessageSendComplex(channel.ID, msgSend)
 		return ""
 	}
-	_, _ = common.BotSession.ChannelMessageSendComplex(channel.ID, msgSend)
+
 	return ""
 }
 
