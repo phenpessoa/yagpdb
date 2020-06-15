@@ -405,10 +405,11 @@ var CheckOnlineCommand = &commands.YAGCommand{
 		if data.Source == dcmd.DMSource {
 			m := make([]map[string]interface{}, len(world.World.PlayersOnline))
 			for k, v := range world.World.PlayersOnline {
-				m[k] = make(map[string]interface{})
-				m[k]["Name"] = v.Name
-				m[k]["Level"] = v.Level
-				m[k]["Vocation"] = v.Vocation
+				m[k] = map[string]interface{}{
+					"Name": v.Name,
+					"Level": v.Level,
+					"Vocation": v.Vocation,
+				}
 			}
 			return m, nil
 		}
