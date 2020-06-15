@@ -286,7 +286,7 @@ func (c *Context) executeParsed() (string, error) {
 	}
 
 	var buf bytes.Buffer
-	w := LimitWriter(&buf, 25000)
+	w := LimitWriter(&buf, 250000)
 
 	started := time.Now()
 	err := parsed.Execute(w, c.Data)
