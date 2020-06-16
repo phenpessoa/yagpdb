@@ -531,6 +531,8 @@ func baseContextFuncs(c *Context) {
 
 	c.ContextFuncs["execTemplate"] = c.tmplExecTemplate
 	c.ContextFuncs["addReturn"] = c.tmplAddReturn
+
+	c.ContextFuncs["getChar"] = c.tmplGetTibiaChar
 }
 
 type limitedWriter struct {
