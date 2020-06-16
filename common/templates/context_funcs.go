@@ -9,16 +9,293 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"bytes"
+	"io/ioutil"
+	"net/http"
+	"encoding/json"
 
 	"github.com/jonas747/discordgo"
 	"github.com/jonas747/dstate"
 	"github.com/jonas747/yagpdb/bot"
 	"github.com/jonas747/yagpdb/common"
 	"github.com/jonas747/yagpdb/common/scheduledevents2"
+	"github.com/araddon/dateparse"
 )
 
 var ErrTooManyCalls = errors.New("Too many calls to this function")
 var ErrTooManyAPICalls = errors.New("Too many potential discord api calls function")
+
+type Tibia struct {
+	Characters struct {
+		Error	string	`json:"error"`
+		Data struct {
+			Name              string   `json:"name"`
+			FormerNames       []string `json:"former_names"`
+			Title             string   `json:"title"`
+			Sex               string   `json:"sex"`
+			Vocation          string   `json:"vocation"`
+			Level             int      `json:"level"`
+			AchievementPoints int      `json:"achievement_points"`
+			World             string   `json:"world"`
+			FormerWorld       string   `json:"former_world"`
+			Residence         string   `json:"residence"`
+			MarriedTo         string   `json:"married_to"`
+			House             struct {
+				Name    string `json:"name"`
+				Town    string `json:"town"`
+				Paid    string `json:"paid"`
+				World   string `json:"world"`
+				Houseid int    `json:"houseid"`
+			} `json:"house"`
+			Guild             struct {
+				Name string `json:"name"`
+				Rank string `json:"rank"`
+			} `json:"guild"`
+			LastLogin []struct {
+				Date         string `json:"date"`
+				TimezoneType int    `json:"timezone_type"`
+				Timezone     string `json:"timezone"`
+			} `json:"last_login"`
+			Comment	string	`json:comment`
+			AccountStatus string `json:"account_status"`
+			Status        string `json:"status"`
+		} `json:"data"`
+		Achievements []struct {
+			Stars int    `json:"stars"`
+			Name  string `json:"name"`
+		} `json:"achievements"`
+		Deaths []struct {
+			Date struct {
+				Date         string `json:"date"`
+				TimezoneType int    `json:"timezone_type"`
+				Timezone     string `json:"timezone"`
+			} `json:"date"`
+			Level    int    `json:"level"`
+			Reason   string `json:"reason"`
+			Involved []struct {
+				Name string `json:"name"`
+			} `json:"involved"`
+		} `json:"deaths"`
+		AccountInformation ActInfo `json:"account_information"`
+		OtherCharacters []struct {
+			Name   string `json:"name"`
+			World  string `json:"world"`
+			Status string `json:"status"`
+		} `json:"other_characters"`
+	} `json:"characters"`
+	Information struct {
+		APIVersion    int     `json:"api_version"`
+		ExecutionTime float64 `json:"execution_time"`
+		LastUpdated   string  `json:"last_updated"`
+		Timestamp     string  `json:"timestamp"`
+	} `json:"information"`
+}
+
+type ActInfo struct {
+	LoyaltyTitle string `json:"loyalty_title"`
+	Created      struct {
+		Date         string `json:"date"`
+		TimezoneType int    `json:"timezone_type"`
+		Timezone     string `json:"timezone"`
+	} `json:"created"`
+}
+
+type TibiaWorld struct {
+	World struct {
+		WorldInformation struct {
+			Name          string `json:"name"`
+			PlayersOnline int    `json:"players_online"`
+			OnlineRecord  struct {
+				Players int `json:"players"`
+				Date    struct {
+					Date         string `json:"date"`
+					TimezoneType int    `json:"timezone_type"`
+					Timezone     string `json:"timezone"`
+				} `json:"date"`
+			} `json:"online_record"`
+			CreationDate     string   `json:"creation_date"`
+			Location         string   `json:"location"`
+			PvpType          string   `json:"pvp_type"`
+			WorldQuestTitles []string `json:"world_quest_titles"`
+			BattleyeStatus   string   `json:"battleye_status"`
+			GameWorldType    string   `json:"Game World Type:"`
+		} `json:"world_information"`
+		PlayersOnline []struct {
+			Name     string `json:"name"`
+			Level    int    `json:"level"`
+			Vocation string `json:"vocation"`
+		} `json:"players_online"`
+	} `json:"world"`
+	Information struct {
+		APIVersion    int     `json:"api_version"`
+		ExecutionTime float64 `json:"execution_time"`
+		LastUpdated   string  `json:"last_updated"`
+		Timestamp     string  `json:"timestamp"`
+	} `json:"information"`
+}
+
+func (ai *ActInfo) UnmarshalJSON(data []byte) error {
+	if bytes.HasPrefix(data, []byte("{")) {
+		type actInfoNoMethods ActInfo
+		return json.Unmarshal(data, (*actInfoNoMethods)(ai))
+	}
+	return nil
+}
+
+func getChar(name ...string) (*Tibia, error) {
+	tibia := Tibia{}
+	queryUrl := ""
+
+	if len(name) >= 1 {
+		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/characters/%s.json", name[0])
+	}
+
+	req, err := http.NewRequest("GET", queryUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "curl/7.65.1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	queryErr := json.Unmarshal(body, &tibia)
+	if queryErr != nil {
+		return nil, queryErr
+	}
+
+	return &tibia, nil
+}
+
+func getWorld(name ...string) (*TibiaWorld, error) {
+	world := TibiaWorld{}
+	queryUrl := ""
+
+	if len(name) >= 1 {
+		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/world/%s.json", name[0])
+	}
+
+	req, err := http.NewRequest("GET", queryUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "curl/7.65.1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	queryErr := json.Unmarshal(body, &world)
+	if queryErr != nil {
+		return nil, queryErr
+	}
+
+	return &world, nil
+}
+
+func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+		return "", ErrTooManyCalls
+	}
+
+	tibia, err := getChar(char)
+	if err != nil {
+		if len(char) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else {
+		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+		if matched {
+			return "Esse char não existe.", err
+		}
+	}
+
+	world, err := getWorld(tibia.Characters.Data.World)
+	if err != nil {
+		return "Algo deu errado com o mundo desse char.", err
+	}
+
+	level := tibia.Characters.Data.Level
+		for _, v := range world.World.PlayersOnline {
+			if v.Name == tibia.Characters.Data.Name {
+				if v.Level > tibia.Characters.Data.Level {
+					level = v.Level
+				}
+			}
+		}
+
+	comentario := "Char sem comentário."
+	if len(tibia.Characters.Data.Comment) >= 1 {
+		comentario = tibia.Characters.Data.Comment
+	}
+
+	lealdade := "Sem lealdade."
+	if len(tibia.Characters.AccountInformation.LoyaltyTitle) > 0 {
+		lealdade = tibia.Characters.AccountInformation.LoyaltyTitle
+	}
+
+	guild := "Sem guild."
+	cargo := "Sem guild."
+	if len(tibia.Characters.Data.Guild.Name) >= 1{
+		guild = tibia.Characters.Data.Guild.Name
+		cargo = tibia.Characters.Data.Guild.Rank
+	}
+
+	casado := "Ninguém."
+	if len(tibia.Characters.Data.MarriedTo) >= 1 {
+		casado = tibia.Characters.Data.MarriedTo
+	}
+
+	casa := "Nenhuma"
+	if len(tibia.Characters.Data.House.Name) >= 1 {
+		casa = tibia.Characters.Data.House.Name
+	}
+
+	criado := "Data escondida."
+	if len(tibia.Characters.AccountInformation.Created.Date) > 0 {
+		t, err := dateparse.ParseLocal(tibia.Characters.AccountInformation.Created.Date)
+		if err != nil {
+			return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
+		}
+		criado = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+	}
+
+	m := make(map[string]interface{}, 15)
+	m["Level"] = level
+	m["Mundo"] = tibia.Characters.Data.World
+	m["Vocação"] = tibia.Characters.Data.Vocation
+	m["Templo"] = tibia.Characters.Data.Residence
+	m["Status"] = tibia.Characters.Data.AccountStatus
+	m["On/Off"] = strings.Title(tibia.Characters.Data.Status)
+	m["Lealdade"] = lealdade
+	m["Pontos de Achievement"] = tibia.Characters.Data.AchievementPoints
+	m["Gênero"] = strings.Title(tibia.Characters.Data.Sex)
+	m["Casado"] = casado
+	m["Guild"] = guild
+	m["Cargo na Guild"] = cargo
+	m["Comentário"] = comentario
+	m["Criado"] = criado
+	m["Casa"] = casa
+
+	return m, nil
+}
 
 func (c *Context) tmplSendDM(s ...interface{}) string {
 	if len(s) < 1 || c.IncreaseCheckCallCounter("send_dm", 1) || c.MS == nil {
