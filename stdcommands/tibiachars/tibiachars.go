@@ -1,131 +1,19 @@
 package tibiachars
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
-	"bytes"
 	"time"
 
 	"github.com/jonas747/dcmd"
 	"github.com/jonas747/discordgo"
 	"github.com/jonas747/yagpdb/commands"
+	"github.com/jonas747/yagpdb/common/templates"
 	"github.com/araddon/dateparse"
 )
-
-type Tibia struct {
-	Characters struct {
-		Error	string	`json:"error"`
-		Data struct {
-			Name              string   `json:"name"`
-			FormerNames       []string `json:"former_names"`
-			Title             string   `json:"title"`
-			Sex               string   `json:"sex"`
-			Vocation          string   `json:"vocation"`
-			Level             int      `json:"level"`
-			AchievementPoints int      `json:"achievement_points"`
-			World             string   `json:"world"`
-			FormerWorld       string   `json:"former_world"`
-			Residence         string   `json:"residence"`
-			MarriedTo         string   `json:"married_to"`
-			House             struct {
-				Name    string `json:"name"`
-				Town    string `json:"town"`
-				Paid    string `json:"paid"`
-				World   string `json:"world"`
-				Houseid int    `json:"houseid"`
-			} `json:"house"`
-			Guild             struct {
-				Name string `json:"name"`
-				Rank string `json:"rank"`
-			} `json:"guild"`
-			LastLogin []struct {
-				Date         string `json:"date"`
-				TimezoneType int    `json:"timezone_type"`
-				Timezone     string `json:"timezone"`
-			} `json:"last_login"`
-			Comment	string	`json:comment`
-			AccountStatus string `json:"account_status"`
-			Status        string `json:"status"`
-		} `json:"data"`
-		Achievements []struct {
-			Stars int    `json:"stars"`
-			Name  string `json:"name"`
-		} `json:"achievements"`
-		Deaths []struct {
-			Date struct {
-				Date         string `json:"date"`
-				TimezoneType int    `json:"timezone_type"`
-				Timezone     string `json:"timezone"`
-			} `json:"date"`
-			Level    int    `json:"level"`
-			Reason   string `json:"reason"`
-			Involved []struct {
-				Name string `json:"name"`
-			} `json:"involved"`
-		} `json:"deaths"`
-		AccountInformation ActInfo `json:"account_information"`
-		OtherCharacters []struct {
-			Name   string `json:"name"`
-			World  string `json:"world"`
-			Status string `json:"status"`
-		} `json:"other_characters"`
-	} `json:"characters"`
-	Information struct {
-		APIVersion    int     `json:"api_version"`
-		ExecutionTime float64 `json:"execution_time"`
-		LastUpdated   string  `json:"last_updated"`
-		Timestamp     string  `json:"timestamp"`
-	} `json:"information"`
-}
-
-type ActInfo struct {
-	LoyaltyTitle string `json:"loyalty_title"`
-	Created      struct {
-		Date         string `json:"date"`
-		TimezoneType int    `json:"timezone_type"`
-		Timezone     string `json:"timezone"`
-	} `json:"created"`
-}
-
-type TibiaWorld struct {
-	World struct {
-		WorldInformation struct {
-			Name          string `json:"name"`
-			PlayersOnline int    `json:"players_online"`
-			OnlineRecord  struct {
-				Players int `json:"players"`
-				Date    struct {
-					Date         string `json:"date"`
-					TimezoneType int    `json:"timezone_type"`
-					Timezone     string `json:"timezone"`
-				} `json:"date"`
-			} `json:"online_record"`
-			CreationDate     string   `json:"creation_date"`
-			Location         string   `json:"location"`
-			PvpType          string   `json:"pvp_type"`
-			WorldQuestTitles []string `json:"world_quest_titles"`
-			BattleyeStatus   string   `json:"battleye_status"`
-			GameWorldType    string   `json:"Game World Type:"`
-		} `json:"world_information"`
-		PlayersOnline []struct {
-			Name     string `json:"name"`
-			Level    int    `json:"level"`
-			Vocation string `json:"vocation"`
-		} `json:"players_online"`
-	} `json:"world"`
-	Information struct {
-		APIVersion    int     `json:"api_version"`
-		ExecutionTime float64 `json:"execution_time"`
-		LastUpdated   string  `json:"last_updated"`
-		Timestamp     string  `json:"timestamp"`
-	} `json:"information"`
-}
 
 var MainCharCommand = &commands.YAGCommand{
 	CmdCategory: commands.CategoryFun,
@@ -135,10 +23,9 @@ var MainCharCommand = &commands.YAGCommand{
 		&dcmd.ArgDef{Name: "Nome do Char", Type: dcmd.String},
 	},
 	RunFunc: func(data *dcmd.Data) (interface{}, error) {
-
 		char := data.Args[0].Str()
 
-		tibia, err := getChar(char)
+		tibia, err := templates.GetChar(char)
 		if err != nil {
 			if len(char) <= 0 {
 				return "Você tem que especificar um char.", err
@@ -164,7 +51,7 @@ var MainCharCommand = &commands.YAGCommand{
 			lealdade = tibia.Characters.AccountInformation.LoyaltyTitle
 		}
 
-		world, err := getWorld(tibia.Characters.Data.World)
+		world, err := templates.GetWorld(tibia.Characters.Data.World)
 		if err != nil {
 			return "Algo deu errado com o mundo desse char.", err
 		}
@@ -290,10 +177,9 @@ var DeathsCommand = &commands.YAGCommand{
 		&dcmd.ArgDef{Name: "Nome do Char", Type: dcmd.String},
 	},
 	RunFunc: func(data *dcmd.Data) (interface{}, error) {
-
 		char := data.Args[0].Str()
 
-		tibia, err := getChar(char)
+		tibia, err := templates.GetChar(char)
 		if err != nil {
 			if len(char) <= 0 {
 				return "Você tem que especificar um char.", err
@@ -386,10 +272,9 @@ var CheckOnlineCommand = &commands.YAGCommand{
 		&dcmd.ArgDef{Name: "Nome do Mundo", Type: dcmd.String},
 	},
 	RunFunc: func(data *dcmd.Data) (interface{}, error) {
-
 		mundo := data.Args[0].Str()
 
-		world, err := getWorld(mundo)
+		world, err := templates.GetWorld(mundo)
 		if err != nil {
 			if len(mundo) <= 0 {
 				return "Você tem que especificar um mundo.", err
@@ -442,78 +327,4 @@ var CheckOnlineCommand = &commands.YAGCommand{
 		return embed, nil
 
 	},
-}
-
-func (ai *ActInfo) UnmarshalJSON(data []byte) error {
-	if bytes.HasPrefix(data, []byte("{")) {
-		type actInfoNoMethods ActInfo
-		return json.Unmarshal(data, (*actInfoNoMethods)(ai))
-	}
-	return nil
-}
-
-func getChar(name ...string) (*Tibia, error) {
-	tibia := Tibia{}
-	queryUrl := ""
-
-	if len(name) >= 1 {
-		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/characters/%s.json", name[0])
-	}
-
-	req, err := http.NewRequest("GET", queryUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", "curl/7.65.1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &tibia)
-	if queryErr != nil {
-		return nil, queryErr
-	}
-
-	return &tibia, nil
-}
-
-func getWorld(name ...string) (*TibiaWorld, error) {
-	world := TibiaWorld{}
-	queryUrl := ""
-
-	if len(name) >= 1 {
-		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/world/%s.json", name[0])
-	}
-
-	req, err := http.NewRequest("GET", queryUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", "curl/7.65.1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &world)
-	if queryErr != nil {
-		return nil, queryErr
-	}
-
-	return &world, nil
 }
