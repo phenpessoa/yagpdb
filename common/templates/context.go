@@ -10,6 +10,9 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"io/ioutil"
+	"net/http"
+	"encoding/json"
 
 	"emperror.dev/errors"
 	"github.com/jonas747/discordgo"
@@ -533,6 +536,7 @@ func baseContextFuncs(c *Context) {
 	c.ContextFuncs["addReturn"] = c.tmplAddReturn
 
 	c.ContextFuncs["getChar"] = c.tmplGetTibiaChar
+	c.ContextFuncs["getDeaths"] = c.tmplGetCharDeaths
 }
 
 type limitedWriter struct {
@@ -694,4 +698,294 @@ func (s Slice) StringSlice(flag ...bool) interface{} {
 	}
 
 	return StringSlice
+}
+
+type Tibia struct {
+	Characters struct {
+		Error	string	`json:"error"`
+		Data struct {
+			Name              string   `json:"name"`
+			FormerNames       []string `json:"former_names"`
+			Title             string   `json:"title"`
+			Sex               string   `json:"sex"`
+			Vocation          string   `json:"vocation"`
+			Level             int      `json:"level"`
+			AchievementPoints int      `json:"achievement_points"`
+			World             string   `json:"world"`
+			FormerWorld       string   `json:"former_world"`
+			Residence         string   `json:"residence"`
+			MarriedTo         string   `json:"married_to"`
+			House             struct {
+				Name    string `json:"name"`
+				Town    string `json:"town"`
+				Paid    string `json:"paid"`
+				World   string `json:"world"`
+				Houseid int    `json:"houseid"`
+			} `json:"house"`
+			Guild             struct {
+				Name string `json:"name"`
+				Rank string `json:"rank"`
+			} `json:"guild"`
+			LastLogin []struct {
+				Date         string `json:"date"`
+				TimezoneType int    `json:"timezone_type"`
+				Timezone     string `json:"timezone"`
+			} `json:"last_login"`
+			Comment	string	`json:comment`
+			AccountStatus string `json:"account_status"`
+			Status        string `json:"status"`
+		} `json:"data"`
+		Achievements []struct {
+			Stars int    `json:"stars"`
+			Name  string `json:"name"`
+		} `json:"achievements"`
+		Deaths []struct {
+			Date struct {
+				Date         string `json:"date"`
+				TimezoneType int    `json:"timezone_type"`
+				Timezone     string `json:"timezone"`
+			} `json:"date"`
+			Level    int    `json:"level"`
+			Reason   string `json:"reason"`
+			Involved []struct {
+				Name string `json:"name"`
+			} `json:"involved"`
+		} `json:"deaths"`
+		AccountInformation ActInfo `json:"account_information"`
+		OtherCharacters []struct {
+			Name   string `json:"name"`
+			World  string `json:"world"`
+			Status string `json:"status"`
+		} `json:"other_characters"`
+	} `json:"characters"`
+	Information struct {
+		APIVersion    int     `json:"api_version"`
+		ExecutionTime float64 `json:"execution_time"`
+		LastUpdated   string  `json:"last_updated"`
+		Timestamp     string  `json:"timestamp"`
+	} `json:"information"`
+}
+
+type ActInfo struct {
+	LoyaltyTitle string `json:"loyalty_title"`
+	Created      struct {
+		Date         string `json:"date"`
+		TimezoneType int    `json:"timezone_type"`
+		Timezone     string `json:"timezone"`
+	} `json:"created"`
+}
+
+type TibiaWorld struct {
+	World struct {
+		WorldInformation struct {
+			Name          string `json:"name"`
+			PlayersOnline int    `json:"players_online"`
+			OnlineRecord  struct {
+				Players int `json:"players"`
+				Date    struct {
+					Date         string `json:"date"`
+					TimezoneType int    `json:"timezone_type"`
+					Timezone     string `json:"timezone"`
+				} `json:"date"`
+			} `json:"online_record"`
+			CreationDate     string   `json:"creation_date"`
+			Location         string   `json:"location"`
+			PvpType          string   `json:"pvp_type"`
+			WorldQuestTitles []string `json:"world_quest_titles"`
+			BattleyeStatus   string   `json:"battleye_status"`
+			GameWorldType    string   `json:"Game World Type:"`
+		} `json:"world_information"`
+		PlayersOnline []struct {
+			Name     string `json:"name"`
+			Level    int    `json:"level"`
+			Vocation string `json:"vocation"`
+		} `json:"players_online"`
+	} `json:"world"`
+	Information struct {
+		APIVersion    int     `json:"api_version"`
+		ExecutionTime float64 `json:"execution_time"`
+		LastUpdated   string  `json:"last_updated"`
+		Timestamp     string  `json:"timestamp"`
+	} `json:"information"`
+}
+
+type TibiaNews struct {
+	Newslist struct {
+		Type string `json:"type"`
+		Data []struct {
+			ID       int    `json:"id"`
+			Type     string `json:"type"`
+			News     string `json:"news"`
+			Apiurl   string `json:"apiurl"`
+			Tibiaurl string `json:"tibiaurl"`
+			Date     struct {
+				Date         string `json:"date"`
+				TimezoneType int    `json:"timezone_type"`
+				Timezone     string `json:"timezone"`
+			} `json:"date"`
+		} `json:"data"`
+	} `json:"newslist"`
+	Information struct {
+		APIVersion    int     `json:"api_version"`
+		ExecutionTime float64 `json:"execution_time"`
+		LastUpdated   string  `json:"last_updated"`
+		Timestamp     string  `json:"timestamp"`
+	} `json:"information"`
+}
+
+type TibiaSpecificNews struct {
+	News struct {
+		Error 	string `json:"error"`
+		ID      int    `json:"id"`
+		Title   string `json:"title"`
+		Content string `json:"content"`
+		Date    struct {
+			Date         string `json:"date"`
+			TimezoneType int    `json:"timezone_type"`
+			Timezone     string `json:"timezone"`
+		} `json:"date"`
+	} `json:"news"`
+	Information struct {
+		APIVersion    int     `json:"api_version"`
+		ExecutionTime float64 `json:"execution_time"`
+		LastUpdated   string  `json:"last_updated"`
+		Timestamp     string  `json:"timestamp"`
+	} `json:"information"`
+}
+
+func (ai *ActInfo) UnmarshalJSON(data []byte) error {
+	if bytes.HasPrefix(data, []byte("{")) {
+		type actInfoNoMethods ActInfo
+		return json.Unmarshal(data, (*actInfoNoMethods)(ai))
+	}
+	return nil
+}
+
+func GetChar(name ...string) (*Tibia, error) {
+	tibia := Tibia{}
+	queryUrl := ""
+
+	if len(name) >= 1 {
+		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/characters/%s.json", name[0])
+	}
+
+	req, err := http.NewRequest("GET", queryUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "curl/7.65.1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	queryErr := json.Unmarshal(body, &tibia)
+	if queryErr != nil {
+		return nil, queryErr
+	}
+
+	return &tibia, nil
+}
+
+func GetWorld(name ...string) (*TibiaWorld, error) {
+	world := TibiaWorld{}
+	queryUrl := ""
+
+	if len(name) >= 1 {
+		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/world/%s.json", name[0])
+	}
+
+	req, err := http.NewRequest("GET", queryUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "curl/7.65.1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	queryErr := json.Unmarshal(body, &world)
+	if queryErr != nil {
+		return nil, queryErr
+	}
+
+	return &world, nil
+}
+
+func GetNews(name string) (*TibiaNews, error) {
+	tibia := TibiaNews{}
+	queryUrl := "https://api.tibiadata.com/v2/latestnews.json"
+
+	if name == "ticker" {
+		queryUrl = "https://api.tibiadata.com/v2/newstickers.json"
+	}
+
+	req, err := http.NewRequest("GET", queryUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "curl/7.65.1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	queryErr := json.Unmarshal(body, &tibia)
+	if queryErr != nil {
+		return nil, err
+	}
+
+	return &tibia, nil
+}
+
+
+func InsideNews(number int) (*TibiaSpecificNews, error) {
+	tibiaInside := TibiaSpecificNews{}
+	queryUrl := fmt.Sprintf("https://api.tibiadata.com/v2/news/%d.json", number)
+
+	req, err := http.NewRequest("GET", queryUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "curl/7.65.1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	queryErr := json.Unmarshal(body, &tibiaInside)
+	if queryErr != nil {
+		return nil, err
+	}
+
+	return &tibiaInside, nil
 }
