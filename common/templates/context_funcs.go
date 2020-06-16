@@ -112,6 +112,10 @@ func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
 }
 
 func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+		return "", ErrTooManyCalls
+	}
+	
 	tibia, err := GetChar(char)
 	if err != nil {
 		if len(char) <= 0 {
