@@ -537,6 +537,8 @@ func baseContextFuncs(c *Context) {
 
 	c.ContextFuncs["getChar"] = c.tmplGetTibiaChar
 	c.ContextFuncs["getDeaths"] = c.tmplGetCharDeaths
+	c.ContextFuncs["getGuild"] = c.tmplGetTibiaSpecificGuild
+	c.ContextFuncs["getGuildMembers"] = c.tmplGetTibiaSpecificGuildMembers
 }
 
 type limitedWriter struct {
@@ -853,6 +855,78 @@ type TibiaSpecificNews struct {
 	} `json:"information"`
 }
 
+type SpecificGuild struct {
+	Guild struct {
+		Error string `json:"error"`
+		Data struct {
+			Name          string        `json:"name"`
+			Description   string        `json:"description"`
+			Guildhall     GuildHouse	`json:"guildhall"`
+			Application   bool          `json:"application"`
+			War           bool          `json:"war"`
+			OnlineStatus  int           `json:"online_status"`
+			OfflineStatus int           `json:"offline_status"`
+			Disbanded     Finalizada    `json:"disbanded"`
+			Totalmembers  int           `json:"totalmembers"`
+			Totalinvited  int           `json:"totalinvited"`
+			World         string        `json:"world"`
+			Founded       string        `json:"founded"`
+			Active        bool          `json:"active"`
+			Guildlogo     string        `json:"guildlogo"`
+		} `json:"data"`
+		Members []struct {
+			RankTitle  string `json:"rank_title"`
+			Characters []struct {
+				Name     string `json:"name"`
+				Nick     string `json:"nick"`
+				Level    int    `json:"level"`
+				Vocation string `json:"vocation"`
+				Joined   string `json:"joined"`
+				Status   string `json:"status"`
+			} `json:"characters"`
+		} `json:"members"`
+		Invited []struct {
+			Name    string `json:"name"`
+			Invited string `json:"invited"`
+		} `json:"invited"`
+	} `json:"guild"`
+	Information struct {
+		APIVersion    int     `json:"api_version"`
+		ExecutionTime float64 `json:"execution_time"`
+		LastUpdated   string  `json:"last_updated"`
+		Timestamp     string  `json:"timestamp"`
+	} `json:"information"`
+}
+
+type Finalizada struct {
+	Notification	string	`json:"notification"`
+	Date			string	`json:"date"`
+}
+
+type GuildHouse struct {
+	Name    string `json:"name"`
+	Town    string `json:"town"`
+	Paid    string `json:"paid"`
+	World   string `json:"world"`
+	Houseid int    `json:"houseid"`
+}
+
+func (f *Finalizada) UnmarshalJSON(data []byte) error {
+	if bytes.HasPrefix(data, []byte("{")) {
+		type finalizadaNoMethods Finalizada
+		return json.Unmarshal(data, (*finalizadaNoMethods)(f))
+	}
+	return nil
+}
+
+func (gh *GuildHouse) UnmarshalJSON(data []byte) error {
+	if bytes.HasPrefix(data, []byte("{")) {
+		type guildHouseNoMethods GuildHouse
+		return json.Unmarshal(data, (*guildHouseNoMethods)(gh))
+	}
+	return nil
+}
+
 func (ai *ActInfo) UnmarshalJSON(data []byte) error {
 	if bytes.HasPrefix(data, []byte("{")) {
 		type actInfoNoMethods ActInfo
@@ -988,4 +1062,33 @@ func InsideNews(number int) (*TibiaSpecificNews, error) {
 	}
 
 	return &tibiaInside, nil
+}
+
+func GetSpecificGuild(name string) (*SpecificGuild, error) {
+	specificGuild := SpecificGuild{}
+	queryUrl := fmt.Sprintf("https://api.tibiadata.com/v2/guild/%s.json", name)
+
+	req, err := http.NewRequest("GET", queryUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "curl/7.65.1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	queryErr := json.Unmarshal(body, &specificGuild)
+	if queryErr != nil {
+		return nil, err
+	}
+
+	return &specificGuild, nil
 }
