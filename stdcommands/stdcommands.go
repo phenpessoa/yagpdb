@@ -50,6 +50,7 @@ import (
 	"github.com/jonas747/yagpdb/stdcommands/editrole"
 	"github.com/jonas747/yagpdb/stdcommands/tibiachars"
 	"github.com/jonas747/yagpdb/stdcommands/tibianews"
+	"github.com/jonas747/yagpdb/stdcommands/tibiaguilds"
 )
 
 var (
@@ -106,6 +107,9 @@ func (p *Plugin) AddCommands() {
 			//News
 			tibianews.NewsCommand,
 			tibianews.NewsTickerCommand,
+
+			//Guilds
+			tibiaguilds.SpecificGuildCommand,
 
 		// Maintenance
 		stateinfo.Command,
