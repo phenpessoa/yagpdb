@@ -1,10 +1,7 @@
 package tibianews
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"math/rand"
 	"regexp"
 	"strings"
@@ -12,52 +9,9 @@ import (
 	"github.com/jonas747/dcmd"
 	"github.com/jonas747/discordgo"
 	"github.com/jonas747/yagpdb/commands"
+	"github.com/jonas747/yagpdb/common/templates"
 	"github.com/araddon/dateparse"
 )
-
-type TibiaNews struct {
-	Newslist struct {
-		Type string `json:"type"`
-		Data []struct {
-			ID       int    `json:"id"`
-			Type     string `json:"type"`
-			News     string `json:"news"`
-			Apiurl   string `json:"apiurl"`
-			Tibiaurl string `json:"tibiaurl"`
-			Date     struct {
-				Date         string `json:"date"`
-				TimezoneType int    `json:"timezone_type"`
-				Timezone     string `json:"timezone"`
-			} `json:"date"`
-		} `json:"data"`
-	} `json:"newslist"`
-	Information struct {
-		APIVersion    int     `json:"api_version"`
-		ExecutionTime float64 `json:"execution_time"`
-		LastUpdated   string  `json:"last_updated"`
-		Timestamp     string  `json:"timestamp"`
-	} `json:"information"`
-}
-
-type TibiaSpecificNews struct {
-	News struct {
-		Error 	string `json:"error"`
-		ID      int    `json:"id"`
-		Title   string `json:"title"`
-		Content string `json:"content"`
-		Date    struct {
-			Date         string `json:"date"`
-			TimezoneType int    `json:"timezone_type"`
-			Timezone     string `json:"timezone"`
-		} `json:"date"`
-	} `json:"news"`
-	Information struct {
-		APIVersion    int     `json:"api_version"`
-		ExecutionTime float64 `json:"execution_time"`
-		LastUpdated   string  `json:"last_updated"`
-		Timestamp     string  `json:"timestamp"`
-	} `json:"information"`
-}
 
 var NewsCommand = &commands.YAGCommand{
 	CmdCategory: commands.CategoryFun,
@@ -68,8 +22,7 @@ var NewsCommand = &commands.YAGCommand{
 		&dcmd.ArgDef{Name: "ID da notícia", Type: dcmd.Int},
 	},
 	RunFunc: func(data *dcmd.Data) (interface{}, error) {
-
-		tibia, err := getNews("")
+		tibia, err := templates.GetNews("")
 		if err != nil {
 			return "Algo deu errado com essa pesquisa.", err
 		}
@@ -83,7 +36,7 @@ var NewsCommand = &commands.YAGCommand{
 
 		url = fmt.Sprintf("https://www.tibia.com/news/?subtopic=newsarchive&id=%d", inside)
 
-		tibiaInside, err := insideNews(inside)
+		tibiaInside, err := templates.InsideNews(inside)
 		if err != nil {
 			return "Algo deu errado com essa pesquisa.", err
 		}
@@ -138,13 +91,12 @@ var NewsTickerCommand = &commands.YAGCommand{
 	Name:        "NewsTicker",
 	Description: "Último newsticker do tibia.",
 	RunFunc: func(data *dcmd.Data) (interface{}, error) {
-
-		tibia, err := getNews("ticker")
+		tibia, err := templates.GetNews("ticker")
 			if err != nil {
 				return "Algo deu errado com essa pesquisa.", err
 		}
 
-		tibiaInside, err := insideNews(tibia.Newslist.Data[0].ID)
+		tibiaInside, err := templates.InsideNews(tibia.Newslist.Data[0].ID)
 		if err != nil {
 			return "Algo deu errado com essa pesquisa.", err
 		}
@@ -192,67 +144,4 @@ var NewsTickerCommand = &commands.YAGCommand{
 		return embed, nil
 
 	},
-}
-
-func getNews(name string) (*TibiaNews, error) {
-	tibia := TibiaNews{}
-	queryUrl := "https://api.tibiadata.com/v2/latestnews.json"
-
-	if name == "ticker" {
-		queryUrl = "https://api.tibiadata.com/v2/newstickers.json"
-	}
-
-	req, err := http.NewRequest("GET", queryUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", "curl/7.65.1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &tibia)
-	if queryErr != nil {
-		return nil, err
-	}
-
-	return &tibia, nil
-}
-
-
-func insideNews(number int) (*TibiaSpecificNews, error) {
-	tibiaInside := TibiaSpecificNews{}
-	queryUrl := fmt.Sprintf("https://api.tibiadata.com/v2/news/%d.json", number)
-
-	req, err := http.NewRequest("GET", queryUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", "curl/7.65.1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &tibiaInside)
-	if queryErr != nil {
-		return nil, err
-	}
-
-	return &tibiaInside, nil
 }
