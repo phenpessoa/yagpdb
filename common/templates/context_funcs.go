@@ -22,133 +22,6 @@ import (
 var ErrTooManyCalls = errors.New("Too many calls to this function")
 var ErrTooManyAPICalls = errors.New("Too many potential discord api calls function")
 
-func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
-		return "", ErrTooManyCalls
-	}
-
-	tibia, err := GetChar(char)
-	if err != nil {
-		if len(char) <= 0 {
-			return "Você tem que especificar um char.", err
-		} else {
-			return "Algo deu errado ao pesquisar esse char.", err
-		}
-	} else {
-		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
-		if matched {
-			return "Esse char não existe.", err
-		}
-	}
-
-	world, err := GetWorld(tibia.Characters.Data.World)
-	if err != nil {
-		return "Algo deu errado com o mundo desse char.", err
-	}
-
-	level := tibia.Characters.Data.Level
-		for _, v := range world.World.PlayersOnline {
-			if v.Name == tibia.Characters.Data.Name {
-				if v.Level > tibia.Characters.Data.Level {
-					level = v.Level
-				}
-			}
-		}
-
-	comentario := "Char sem comentário."
-	if len(tibia.Characters.Data.Comment) >= 1 {
-		comentario = tibia.Characters.Data.Comment
-	}
-
-	lealdade := "Sem lealdade."
-	if len(tibia.Characters.AccountInformation.LoyaltyTitle) > 0 {
-		lealdade = tibia.Characters.AccountInformation.LoyaltyTitle
-	}
-
-	guild := "Sem guild."
-	cargo := "Sem guild."
-	if len(tibia.Characters.Data.Guild.Name) >= 1{
-		guild = tibia.Characters.Data.Guild.Name
-		cargo = tibia.Characters.Data.Guild.Rank
-	}
-
-	casado := "Ninguém."
-	if len(tibia.Characters.Data.MarriedTo) >= 1 {
-		casado = tibia.Characters.Data.MarriedTo
-	}
-
-	casa := "Nenhuma"
-	if len(tibia.Characters.Data.House.Name) >= 1 {
-		casa = tibia.Characters.Data.House.Name
-	}
-
-	criado := "Data escondida."
-	if len(tibia.Characters.AccountInformation.Created.Date) > 0 {
-		t, err := dateparse.ParseLocal(tibia.Characters.AccountInformation.Created.Date)
-		if err != nil {
-			return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
-		}
-		criado = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
-	}
-
-	m := make(map[string]interface{}, 15)
-	m["Level"] = level
-	m["Mundo"] = tibia.Characters.Data.World
-	m["Vocação"] = tibia.Characters.Data.Vocation
-	m["Templo"] = tibia.Characters.Data.Residence
-	m["Status"] = tibia.Characters.Data.AccountStatus
-	m["On/Off"] = strings.Title(tibia.Characters.Data.Status)
-	m["Lealdade"] = lealdade
-	m["Pontos de Achievement"] = tibia.Characters.Data.AchievementPoints
-	m["Gênero"] = strings.Title(tibia.Characters.Data.Sex)
-	m["Casado"] = casado
-	m["Guild"] = guild
-	m["Cargo na Guild"] = cargo
-	m["Comentário"] = comentario
-	m["Criado"] = criado
-	m["Casa"] = casa
-
-	return m, nil
-}
-
-func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
-		return "", ErrTooManyCalls
-	}
-	
-	tibia, err := GetChar(char)
-	if err != nil {
-		if len(char) <= 0 {
-			return "Você tem que especificar um char.", err
-		} else {
-			return "Algo deu errado ao pesquisar esse char.", err
-		}
-	} else {
-		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
-		if matched {
-			return "Esse char não existe.", err
-		}
-	}
-
-	mortes := tibia.Characters.Deaths
-	if len(mortes) >= 1 {
-		t, err := dateparse.ParseLocal(mortes[0].Date.Date)
-		if err != nil {
-			return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
-		}
-		embedCC := &discordgo.MessageEmbed{
-			Title: fmt.Sprintf("Mortes recentes de %s", tibia.Characters.Data.Name),
-			Description: fmt.Sprintf("**Data**: %s\n**Level**: %d\n**Motivo**: %s\n\n", (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT"), mortes[0].Level, mortes[0].Reason),
-			Color: int(rand.Int63n(16777215)),
-		}
-		return embedCC, nil
-	} else {
-		return "Esse char não tem mortes recentes.", nil
-	}
-
-	return "", nil
-}
-
 func (c *Context) tmplSendDM(s ...interface{}) string {
 	if len(s) < 1 || c.IncreaseCheckCallCounter("send_dm", 1) || c.MS == nil {
 		return ""
@@ -1442,6 +1315,234 @@ func (c *Context) tmplEditNickname(Nickname string) (string, error) {
 	err := common.BotSession.GuildMemberNickname(c.GS.ID, c.MS.ID, Nickname)
 	if err != nil {
 		return "", err
+	}
+
+	return "", nil
+}
+
+func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+		return "", ErrTooManyCalls
+	}
+
+	guild, err := GetSpecificGuild(guildName)
+	if err != nil {
+		if len(guildName) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else if len(guild.Guild.Error) >= 1 {
+		return "Essa guild não existe.", err
+	}
+
+	desc := "Guild sem descrição."
+	if len(guild.Guild.Data.Description) >= 1 && len(guild.Guild.Data.Description) < 2048 {
+		desc = guild.Guild.Data.Description
+	}
+
+	guildHall := "Nenhuma."
+	if len(guild.Guild.Data.Guildhall.Name) > 1 {
+		guildHall = fmt.Sprintf("**%s** que fica em %s", guild.Guild.Data.Guildhall.Name, guild.Guild.Data.Guildhall.Town)
+	}
+
+	guerra := "Não."
+	if guild.Guild.Data.War {
+		guerra = "Sim."
+	}
+
+	embedCC := &discordgo.MessageEmbed{
+		Title: guild.Guild.Data.Name,
+		Color: int(rand.Int63n(16777215)),
+		Description: desc,
+		Fields: []*discordgo.MessageEmbedField{
+			&discordgo.MessageEmbedField{
+				Name:   "Número de membros",
+				Value:  strconv.Itoa(guild.Guild.Data.Totalmembers),
+				Inline: true,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Mundo",
+				Value:  guild.Guild.Data.World,
+				Inline: true,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Guild Hall",
+				Value:  guildHall,
+				Inline: true,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Está em Guerra?",
+				Value:  guerra,
+				Inline: true,
+			},
+		},
+	}
+
+	return embedCC, nil
+}
+
+func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+		return "", ErrTooManyCalls
+	}
+
+	guild, err := GetSpecificGuild(guildName)
+	if err != nil {
+		if len(guildName) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else if len(guild.Guild.Error) >= 1 {
+		return "Essa guild não existe.", err
+	}
+
+	length := 0
+	for _, value := range guild.Guild.Members {
+		for _, _ = range value.Characters {
+			length += 1
+		}
+	}
+
+	m := make([]map[string]interface{}, length)
+	for _, tipo := range guild.Guild.Members {
+		for k, v := range tipo.Characters {
+			m[k] = map[string]interface{}{
+				"Name": v.Name,
+				"Nick": v.Nick,
+				"Level": v.Level,
+				"Vocation": v.Vocation,
+				"Status": v.Status,
+			}
+		}
+	}
+
+	return m, nil
+}
+
+func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+		return "", ErrTooManyCalls
+	}
+
+	tibia, err := GetChar(char)
+	if err != nil {
+		if len(char) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else {
+		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+		if matched {
+			return "Esse char não existe.", err
+		}
+	}
+
+	world, err := GetWorld(tibia.Characters.Data.World)
+	if err != nil {
+		return "Algo deu errado com o mundo desse char.", err
+	}
+
+	level := tibia.Characters.Data.Level
+		for _, v := range world.World.PlayersOnline {
+			if v.Name == tibia.Characters.Data.Name {
+				if v.Level > tibia.Characters.Data.Level {
+					level = v.Level
+				}
+			}
+		}
+
+	comentario := "Char sem comentário."
+	if len(tibia.Characters.Data.Comment) >= 1 {
+		comentario = tibia.Characters.Data.Comment
+	}
+
+	lealdade := "Sem lealdade."
+	if len(tibia.Characters.AccountInformation.LoyaltyTitle) > 0 {
+		lealdade = tibia.Characters.AccountInformation.LoyaltyTitle
+	}
+
+	guild := "Sem guild."
+	cargo := "Sem guild."
+	if len(tibia.Characters.Data.Guild.Name) >= 1{
+		guild = tibia.Characters.Data.Guild.Name
+		cargo = tibia.Characters.Data.Guild.Rank
+	}
+
+	casado := "Ninguém."
+	if len(tibia.Characters.Data.MarriedTo) >= 1 {
+		casado = tibia.Characters.Data.MarriedTo
+	}
+
+	casa := "Nenhuma"
+	if len(tibia.Characters.Data.House.Name) >= 1 {
+		casa = tibia.Characters.Data.House.Name
+	}
+
+	criado := "Data escondida."
+	if len(tibia.Characters.AccountInformation.Created.Date) > 0 {
+		t, err := dateparse.ParseLocal(tibia.Characters.AccountInformation.Created.Date)
+		if err != nil {
+			return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
+		}
+		criado = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+	}
+
+	m := make(map[string]interface{}, 15)
+	m["Level"] = level
+	m["Mundo"] = tibia.Characters.Data.World
+	m["Vocação"] = tibia.Characters.Data.Vocation
+	m["Templo"] = tibia.Characters.Data.Residence
+	m["Status"] = tibia.Characters.Data.AccountStatus
+	m["On/Off"] = strings.Title(tibia.Characters.Data.Status)
+	m["Lealdade"] = lealdade
+	m["Pontos de Achievement"] = tibia.Characters.Data.AchievementPoints
+	m["Gênero"] = strings.Title(tibia.Characters.Data.Sex)
+	m["Casado"] = casado
+	m["Guild"] = guild
+	m["Cargo na Guild"] = cargo
+	m["Comentário"] = comentario
+	m["Criado"] = criado
+	m["Casa"] = casa
+
+	return m, nil
+}
+
+func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+		return "", ErrTooManyCalls
+	}
+
+	tibia, err := GetChar(char)
+	if err != nil {
+		if len(char) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else {
+		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+		if matched {
+			return "Esse char não existe.", err
+		}
+	}
+
+	mortes := tibia.Characters.Deaths
+	if len(mortes) >= 1 {
+		t, err := dateparse.ParseLocal(mortes[0].Date.Date)
+		if err != nil {
+			return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
+		}
+		embedCC := &discordgo.MessageEmbed{
+			Title: fmt.Sprintf("Mortes recentes de %s", tibia.Characters.Data.Name),
+			Description: fmt.Sprintf("**Data**: %s\n**Level**: %d\n**Motivo**: %s\n\n", (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT"), mortes[0].Level, mortes[0].Reason),
+			Color: int(rand.Int63n(16777215)),
+		}
+		return embedCC, nil
+	} else {
+		return "Esse char não tem mortes recentes.", nil
 	}
 
 	return "", nil
