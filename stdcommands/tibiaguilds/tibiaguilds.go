@@ -16,7 +16,7 @@ var SpecificGuildCommand = &commands.YAGCommand{
 	Name:        "Guild",
 	Description: "Retorna informações da guild especificada.",
 	Arguments: []*dcmd.ArgDef{
-		&dcmd.ArgDef{Name: "Nome do Char", Type: dcmd.String},
+		&dcmd.ArgDef{Name: "Nome da Guild", Type: dcmd.String},
 	},
 	RunFunc: func(data *dcmd.Data) (interface{}, error) {
 		guildName := data.Args[0].Str()
