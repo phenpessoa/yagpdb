@@ -1398,23 +1398,16 @@ func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{
 		return "Essa guild não existe.", err
 	}
 
-	length := 0
-	for _, value := range guild.Guild.Members {
-		for _, _ = range value.Characters {
-			length += 1
-		}
-	}
-
-	m := make([]map[string]interface{}, length)
+	m := make([]map[string]interface{}, 0)
 	for _, tipo := range guild.Guild.Members {
-		for k, v := range tipo.Characters {
-			m[k] = map[string]interface{}{
+		for _, v := range tipo.Characters {
+			m = append(m, map[string]interface{}{
 				"Name": v.Name,
 				"Nick": v.Nick,
 				"Level": v.Level,
 				"Vocation": v.Vocation,
 				"Status": v.Status,
-			}
+			})
 		}
 	}
 
