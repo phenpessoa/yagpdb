@@ -1540,3 +1540,20 @@ func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
 
 	return "", nil
 }
+
+func (c *Context) tmplCheckWorld(mundo string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 5) {
+		return "", ErrTooManyCalls
+	}
+
+	world, err := GetWorld(mundo)
+	if err != nil {
+		return false, nil
+	}
+
+	if len(world.World.WorldInformation.CreationDate) > 0 {
+		return true, nil
+	}
+
+	return false, nil
+}
