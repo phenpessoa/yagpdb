@@ -1328,7 +1328,7 @@ func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, erro
 	guild, err := GetSpecificGuild(guildName)
 	if err != nil {
 		if len(guildName) <= 0 {
-			return "Você tem que especificar um char.", err
+			return "Você tem que especificar uma guild.", err
 		} else {
 			return "Algo deu errado ao pesquisar esse char.", err
 		}
@@ -1390,7 +1390,7 @@ func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{
 	guild, err := GetSpecificGuild(guildName)
 	if err != nil {
 		if len(guildName) <= 0 {
-			return "Você tem que especificar um char.", err
+			return "Você tem que especificar uma guild.", err
 		} else {
 			return "Algo deu errado ao pesquisar esse char.", err
 		}
