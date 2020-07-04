@@ -539,6 +539,7 @@ func baseContextFuncs(c *Context) {
 	c.ContextFuncs["getDeaths"] = c.tmplGetCharDeaths
 	c.ContextFuncs["getGuild"] = c.tmplGetTibiaSpecificGuild
 	c.ContextFuncs["getGuildMembers"] = c.tmplGetTibiaSpecificGuildMembers
+	c.ContextFuncs["checkWorld"] = c.tmplCheckWorld
 }
 
 type limitedWriter struct {
