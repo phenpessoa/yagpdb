@@ -1322,7 +1322,7 @@ func (c *Context) tmplEditNickname(Nickname string) (string, error) {
 }
 
 func (c *Context) tmplSort (slice []interface{}, inv bool) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 1, 3) {
+	if c.IncreaseCheckCallCounterPremium("sortfuncs", 1, 3) {
 		return "", ErrTooManyCalls
 	}
 
