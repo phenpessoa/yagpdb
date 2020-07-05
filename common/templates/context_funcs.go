@@ -1321,7 +1321,7 @@ func (c *Context) tmplEditNickname(Nickname string) (string, error) {
 	return "", nil
 }
 
-func (c *Context) tmplSort (slice []interface{}, inv bool, subslices ...bool) (interface{}, error) {
+func (c *Context) tmplSort (slice []interface{}, inv bool, subslices bool) (interface{}, error) {
 	if c.IncreaseCheckCallCounterPremium("sortfuncs", 1, 3) {
 		return "", ErrTooManyCalls
 	}
@@ -1410,7 +1410,7 @@ func (c *Context) tmplSort (slice []interface{}, inv bool, subslices ...bool) (i
 	return outputSlice, nil
 }
 
-func (c *Context) tmplSortAsc (slice []interface{}, subslices ...bool) (interface{}, error) {
+func (c *Context) tmplSortAsc (slice []interface{}, subslices bool) (interface{}, error) {
 	output, err := c.tmplSort(slice, false, subslices)
 	if err != nil {
 		return "", err
@@ -1419,7 +1419,7 @@ func (c *Context) tmplSortAsc (slice []interface{}, subslices ...bool) (interfac
 	return output, nil
 }
 
-func (c *Context) tmplSortDesc (slice []interface{}, subslices ...bool) (interface{}, error) {
+func (c *Context) tmplSortDesc (slice []interface{}, subslices bool) (interface{}, error) {
 	output, err := c.tmplSort(slice, true, subslices)
 	if err != nil {
 		return "", err
