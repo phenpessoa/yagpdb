@@ -1321,7 +1321,7 @@ func (c *Context) tmplEditNickname(Nickname string) (string, error) {
 	return "", nil
 }
 
-func (c *Context) tmplSort (slice []interface{}, inv bool, subslices bool) (interface{}, error) {
+func (c *Context) tmplSort (slice []interface{}, inv bool, subslices ...bool) (interface{}, error) {
 	if c.IncreaseCheckCallCounterPremium("sortfuncs", 1, 3) {
 		return "", ErrTooManyCalls
 	}
@@ -1402,7 +1402,7 @@ func (c *Context) tmplSort (slice []interface{}, inv bool, subslices bool) (inte
 			outputSlice = append(outputSlice, v)
 		}
 
-		for _, v := range timeSLice {
+		for _, v := range timeSlice {
 			outputSlice = append(outputSlice, v)
 		}
 	}
