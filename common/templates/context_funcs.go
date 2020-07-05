@@ -1378,7 +1378,7 @@ func (c *Context) tmplSort (slice []interface{}, inv bool) (interface{}, error) 
 }
 
 func (c *Context) tmplSortAsc (slice []interface{}) (interface{}, error) {
-	output, err := tmplSort(slice, false)
+	output, err := c.tmplSort(slice, false)
 	if err != nil {
 		return "", err
 	}
@@ -1387,7 +1387,7 @@ func (c *Context) tmplSortAsc (slice []interface{}) (interface{}, error) {
 }
 
 func (c *Context) tmplSortDesc (slice []interface{}) (interface{}, error) {
-	output, err := tmplSort(slice, true)
+	output, err := c.tmplSort(slice, true)
 	if err != nil {
 		return "", err
 	}
