@@ -1410,22 +1410,62 @@ func (c *Context) tmplSort (slice []interface{}, inv bool, subslices bool) (inte
 	return outputSlice, nil
 }
 
-func (c *Context) tmplSortAsc (slice []interface{}, subslices bool) (interface{}, error) {
-	output, err := c.tmplSort(slice, false, subslices)
-	if err != nil {
-		return "", err
+func (c *Context) tmplSortAsc (slice []interface{}, subslices ...bool) (interface{}, error) {
+	switch len(subslices) {
+	case 0:
+		output, err := c.tmplSort(slice, false, false)
+		if err != nil {
+			return "", err
+		}
+		return output, nil
+	case 1:
+		if subslices[0] {
+			output, err := c.tmplSort(slice, false, true)
+			if err != nil {
+				return "", err
+			}
+			return output, nil
+		} else {
+			output, err := c.tmplSort(slice, false, false)
+			if err != nil {
+				return "", err
+			}
+			return output, nil
+		}
+	default:
+		return "", errors.New("Too many args.")
 	}
 
-	return output, nil
+	return "", nil
 }
 
-func (c *Context) tmplSortDesc (slice []interface{}, subslices bool) (interface{}, error) {
-	output, err := c.tmplSort(slice, true, subslices)
-	if err != nil {
-		return "", err
+func (c *Context) tmplSortDesc (slice []interface{}, subslices ...bool) (interface{}, error) {
+	switch len(subslices) {
+	case 0:
+		output, err := c.tmplSort(slice, true, false)
+		if err != nil {
+			return "", err
+		}
+		return output, nil
+	case 1:
+		if subslices[0] {
+			output, err := c.tmplSort(slice, true, true)
+			if err != nil {
+				return "", err
+			}
+			return output, nil
+		} else {
+			output, err := c.tmplSort(slice, true, false)
+			if err != nil {
+				return "", err
+			}
+			return output, nil
+		}
+	default:
+		return "", errors.New("Too many args.")
 	}
 
-	return output, nil
+	return "", nil
 }
 
 func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, error) {
