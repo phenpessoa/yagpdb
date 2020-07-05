@@ -1321,7 +1321,7 @@ func (c *Context) tmplEditNickname(Nickname string) (string, error) {
 	return "", nil
 }
 
-func (c *Context) tmplSort (slice []interface{}, inv bool) (interface{}, error) {
+func (c *Context) tmplSort (slice []interface{}, inv bool, subslices bool) (interface{}, error) {
 	if c.IncreaseCheckCallCounterPremium("sortfuncs", 1, 3) {
 		return "", ErrTooManyCalls
 	}
@@ -1330,6 +1330,7 @@ func (c *Context) tmplSort (slice []interface{}, inv bool) (interface{}, error) 
 	stringSlice := make([]string, 0)
 	floatSlice := make([]float64, 0)
 	defaultSlice := make([]interface{}, 0)
+	timeSlice := make([]interface{}, 0)
 	outputSlice := make([]interface{}, 0)
 
 	for _, v := range slice {
@@ -1343,6 +1344,10 @@ func (c *Context) tmplSort (slice []interface{}, inv bool) (interface{}, error) 
 			stringSlice = append(stringSlice, t)
 		case float64:
 			floatSlice = append(floatSlice, t)
+		case time.Time:
+			timeSlice = append(timeSlice, t)
+		case *time.Time:
+			timeSlice = append(timeSlice, t)
 		default:
 			defaultSlice = append(defaultSlice, t)
 		}
@@ -1352,33 +1357,61 @@ func (c *Context) tmplSort (slice []interface{}, inv bool) (interface{}, error) 
 		sort.Sort(sort.Reverse(sort.Float64Slice(floatSlice)))
 		sort.Slice(intSlice, func(i, j int) bool { return intSlice[i] > intSlice[j] })
 		sort.Sort(sort.Reverse(sort.StringSlice(stringSlice)))
+		sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[j].(time.Time).Before(timeSlice[i].(time.Time)) })
 	} else {
 		sort.Float64s(floatSlice)
 		sort.Slice(intSlice, func(i, j int) bool { return intSlice[i] < intSlice[j] })
 		sort.Strings(stringSlice)
+		sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[i].(time.Time).Before(timeSlice[j].(time.Time)) })
 	}
 
-	if len(intSlice) > 0 {
-		outputSlice = append(outputSlice, intSlice)
-	}
+	if subslices {
+		if len(intSlice) > 0 {
+			outputSlice = append(outputSlice, intSlice)
+		}
 
-	if len(stringSlice) > 0 {
-		outputSlice = append(outputSlice, stringSlice)
-	}
+		if len(stringSlice) > 0 {
+			outputSlice = append(outputSlice, stringSlice)
+		}
 
-	if len(floatSlice) > 0 {
-		outputSlice = append(outputSlice, floatSlice)
-	}
+		if len(floatSlice) > 0 {
+			outputSlice = append(outputSlice, floatSlice)
+		}
 
-	if len(defaultSlice) > 0 {
-		outputSlice = append(outputSlice, defaultSlice)
+		if len(defaultSlice) > 0 {
+			outputSlice = append(outputSlice, defaultSlice)
+		}
+
+		if len(timeSlice) > 0 {
+			outputSlice = append(outputSlice, timeSlice)
+		}
+	} else {
+		for _, v := range intSlice {
+			outputSlice = append(outputSlice, v)
+		}
+
+		for _, v := range stringSlice {
+			outputSlice = append(outputSlice, v)
+		}
+
+		for _, v := range floatSlice {
+			outputSlice = append(outputSlice, v)
+		}
+
+		for _, v := range defaultSlice {
+			outputSlice = append(outputSlice, v)
+		}
+
+		for _, v := range timeSLice {
+			outputSlice = append(outputSlice, v)
+		}
 	}
 
 	return outputSlice, nil
 }
 
-func (c *Context) tmplSortAsc (slice []interface{}) (interface{}, error) {
-	output, err := c.tmplSort(slice, false)
+func (c *Context) tmplSortAsc (slice []interface{}, subslices ...bool) (interface{}, error) {
+	output, err := c.tmplSort(slice, false, subslices)
 	if err != nil {
 		return "", err
 	}
@@ -1386,8 +1419,8 @@ func (c *Context) tmplSortAsc (slice []interface{}) (interface{}, error) {
 	return output, nil
 }
 
-func (c *Context) tmplSortDesc (slice []interface{}) (interface{}, error) {
-	output, err := c.tmplSort(slice, true)
+func (c *Context) tmplSortDesc (slice []interface{}, subslices ...bool) (interface{}, error) {
+	output, err := c.tmplSort(slice, true, subslices)
 	if err != nil {
 		return "", err
 	}
