@@ -1347,7 +1347,7 @@ func (c *Context) tmplSort (slice []interface{}, inv bool, subslices bool) (inte
 		case time.Time:
 			timeSlice = append(timeSlice, t)
 		case *time.Time:
-			timeSlice = append(timeSlice, t)
+			timeSlice = append(timeSlice, *t)
 		default:
 			defaultSlice = append(defaultSlice, t)
 		}
