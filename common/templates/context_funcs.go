@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"math/rand"
+	"sort"
 
 	"github.com/jonas747/discordgo"
 	"github.com/jonas747/dstate"
@@ -1318,6 +1319,80 @@ func (c *Context) tmplEditNickname(Nickname string) (string, error) {
 	}
 
 	return "", nil
+}
+
+func (c *Context) tmplSort (slice []interface{}, inv bool) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 1, 3) {
+		return "", ErrTooManyCalls
+	}
+
+	intSlice := make([]int64, 0)
+	stringSlice := make([]string, 0)
+	floatSlice := make([]float64, 0)
+	defaultSlice := make([]interface{}, 0)
+	outputSlice := make([]interface{}, 0)
+
+	for _, v := range slice {
+		switch t := v.(type) {
+		case int:
+			value := int64(t)
+			intSlice = append(intSlice, value)
+		case int64:
+			intSlice = append(intSlice, t)
+		case string:
+			stringSlice = append(stringSlice, t)
+		case float64:
+			floatSlice = append(floatSlice, t)
+		default:
+			defaultSlice = append(defaultSlice, t)
+		}
+	}
+
+	if inv {
+		sort.Sort(sort.Reverse(sort.Float64Slice(floatSlice)))
+		sort.Slice(intSlice, func(i, j int) bool { return intSlice[i] > intSlice[j] })
+		sort.Sort(sort.Reverse(sort.StringSlice(stringSlice)))
+	} else {
+		sort.Float64s(floatSlice)
+		sort.Slice(intSlice, func(i, j int) bool { return intSlice[i] < intSlice[j] })
+		sort.Strings(stringSlice)
+	}
+
+	if len(intSlice) > 0 {
+		outputSlice = append(outputSlice, intSlice)
+	}
+
+	if len(stringSlice) > 0 {
+		outputSlice = append(outputSlice, stringSlice)
+	}
+
+	if len(floatSlice) > 0 {
+		outputSlice = append(outputSlice, floatSlice)
+	}
+
+	if len(defaultSlice) > 0 {
+		outputSlice = append(outputSlice, defaultSlice)
+	}
+
+	return outputSlice, nil
+}
+
+func (c *Context) tmplSortAsc (slice []interface{}) (interface{}, error) {
+	output, err := tmplSort(slice, false)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
+}
+
+func (c *Context) tmplSortDesc (slice []interface{}) (interface{}, error) {
+	output, err := tmplSort(slice, true)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
 }
 
 func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, error) {
