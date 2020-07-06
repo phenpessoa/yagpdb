@@ -535,8 +535,8 @@ func baseContextFuncs(c *Context) {
 	c.ContextFuncs["execTemplate"] = c.tmplExecTemplate
 	c.ContextFuncs["addReturn"] = c.tmplAddReturn
 
-	c.ContextFuncs["sortAsc"]= c.tmplSortAsc
-	c.ContextFuncs["sortDesc"]= c.tmplSortDesc
+	c.ContextFuncs["sortAsc"] = c.tmplSortAsc
+	c.ContextFuncs["sortDesc"] = c.tmplSortDesc
 
 	c.ContextFuncs["getChar"] = c.tmplGetTibiaChar
 	c.ContextFuncs["getDeaths"] = c.tmplGetCharDeaths
