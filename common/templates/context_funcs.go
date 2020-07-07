@@ -11,6 +11,7 @@ import (
 	"time"
 	"math/rand"
 	"sort"
+	"encoding/json"
 
 	"github.com/jonas747/discordgo"
 	"github.com/jonas747/dstate"
@@ -1321,151 +1322,162 @@ func (c *Context) tmplEditNickname(Nickname string) (string, error) {
 	return "", nil
 }
 
-func (c *Context) tmplSort (slice []interface{}, inv bool, subslices bool) (interface{}, error) {
+type SortArgs struct {
+	Reverse		bool	`json:"reverse"`
+	Subslices	bool	`json:"subslices"`
+	Emptyslices	bool	`json:"emptyslices"`
+}
+
+func (c *Context) tmplSort (slice []interface{}, sortargs ...interface{}) (interface{}, error) {
 	if c.IncreaseCheckCallCounterPremium("sortfuncs", 1, 3) {
 		return "", ErrTooManyCalls
 	}
 
-	intSlice := make([]int64, 0)
-	stringSlice := make([]string, 0)
-	floatSlice := make([]float64, 0)
-	defaultSlice := make([]interface{}, 0)
-	timeSlice := make([]interface{}, 0)
-	outputSlice := make([]interface{}, 0)
-
-	for _, v := range slice {
-		switch t := v.(type) {
-		case int:
-			value := int64(t)
-			intSlice = append(intSlice, value)
-		case int64:
-			intSlice = append(intSlice, t)
-		case string:
-			stringSlice = append(stringSlice, t)
-		case float64:
-			floatSlice = append(floatSlice, t)
-		case time.Time:
-			timeSlice = append(timeSlice, t)
-		case *time.Time:
-			timeSlice = append(timeSlice, *t)
-		default:
-			defaultSlice = append(defaultSlice, t)
+	switch len(sortargs) {
+	case 0, 1:
+		var dict SDict
+		if len(sortargs) == 0 {
+			input := make(map[string]interface{}, 3)
+			input["reverse"] = false
+			input["subslices"] = false
+			input["emptyslices"] = false
+			sdict, err := StringKeyDictionary(input)
+			if err != nil {
+				return "", err
+			}
+			dict = sdict
+		} else {
+			sdict, err := StringKeyDictionary(sortargs[0])
+			if err != nil {
+				return "", err
+			}
+			dict = sdict
 		}
-	}
-
-	if inv {
-		sort.Sort(sort.Reverse(sort.Float64Slice(floatSlice)))
-		sort.Slice(intSlice, func(i, j int) bool { return intSlice[i] > intSlice[j] })
-		sort.Sort(sort.Reverse(sort.StringSlice(stringSlice)))
-		sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[j].(time.Time).Before(timeSlice[i].(time.Time)) })
-	} else {
-		sort.Float64s(floatSlice)
-		sort.Slice(intSlice, func(i, j int) bool { return intSlice[i] < intSlice[j] })
-		sort.Strings(stringSlice)
-		sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[i].(time.Time).Before(timeSlice[j].(time.Time)) })
-	}
-
-	if subslices {
-		if len(intSlice) > 0 {
-			outputSlice = append(outputSlice, intSlice)
-		}
-
-		if len(stringSlice) > 0 {
-			outputSlice = append(outputSlice, stringSlice)
-		}
-
-		if len(floatSlice) > 0 {
-			outputSlice = append(outputSlice, floatSlice)
-		}
-
-		if len(defaultSlice) > 0 {
-			outputSlice = append(outputSlice, defaultSlice)
-		}
-
-		if len(timeSlice) > 0 {
-			outputSlice = append(outputSlice, timeSlice)
-		}
-	} else {
-		for _, v := range intSlice {
-			outputSlice = append(outputSlice, v)
-		}
-
-		for _, v := range stringSlice {
-			outputSlice = append(outputSlice, v)
-		}
-
-		for _, v := range floatSlice {
-			outputSlice = append(outputSlice, v)
-		}
-
-		for _, v := range defaultSlice {
-			outputSlice = append(outputSlice, v)
-		}
-
-		for _, v := range timeSlice {
-			outputSlice = append(outputSlice, v)
-		}
-	}
-
-	return outputSlice, nil
-}
-
-func (c *Context) tmplSortAsc (slice []interface{}, subslices ...bool) (interface{}, error) {
-	switch len(subslices) {
-	case 0:
-		output, err := c.tmplSort(slice, false, false)
+		var sa SortArgs
+		encoded, err := json.Marshal(dict)
 		if err != nil {
 			return "", err
 		}
-		return output, nil
-	case 1:
-		if subslices[0] {
-			output, err := c.tmplSort(slice, false, true)
-			if err != nil {
-				return "", err
-			}
-			return output, nil
-		} else {
-			output, err := c.tmplSort(slice, false, false)
-			if err != nil {
-				return "", err
-			}
-			return output, nil
-		}
-	default:
-		return "", errors.New("Too many args.")
-	}
-
-	return "", nil
-}
-
-func (c *Context) tmplSortDesc (slice []interface{}, subslices ...bool) (interface{}, error) {
-	switch len(subslices) {
-	case 0:
-		output, err := c.tmplSort(slice, true, false)
+		err = json.Unmarshal(encoded, &sa)
 		if err != nil {
 			return "", err
 		}
-		return output, nil
-	case 1:
-		if subslices[0] {
-			output, err := c.tmplSort(slice, true, true)
-			if err != nil {
-				return "", err
+
+		numberSlice := make([]interface{}, 0)
+		stringSlice := make([]string, 0)
+		timeSlice := make([]interface{}, 0)
+		csliceSlice := make([]interface{}, 0)
+		mapSlice := make([]interface{}, 0)
+		defaultSlice := make([]interface{}, 0)
+		outputSlice := make([]interface{}, 0)
+
+		for _, v := range slice {
+			switch t := v.(type) {
+			case int, int64, float64:
+				numberSlice = append(numberSlice, t)
+			case string:
+				stringSlice = append(stringSlice, t)
+			case time.Time:
+				timeSlice = append(timeSlice, t)
+			case *time.Time:
+				timeSlice = append(timeSlice, *t)
+			default:
+				v := reflect.ValueOf(t)
+				switch v.Kind() {
+				case reflect.Slice:
+					csliceSlice = append(csliceSlice, t)
+				case reflect.Map:
+					mapSlice = append(mapSlice, t)
+				default:
+					defaultSlice = append(defaultSlice, t)
+				}
 			}
-			return output, nil
-		} else {
-			output, err := c.tmplSort(slice, true, false)
-			if err != nil {
-				return "", err
-			}
-			return output, nil
 		}
+
+		if sa.Reverse {
+			sort.Slice(numberSlice, func(i, j int) bool { return ToFloat64(numberSlice[i]) > ToFloat64(numberSlice[j]) })
+			sort.Sort(sort.Reverse(sort.StringSlice(stringSlice)))
+			sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[j].(time.Time).Before(timeSlice[i].(time.Time)) })
+			sort.Slice(csliceSlice, func(i, j int) bool { return getLen(csliceSlice[i]) > getLen(csliceSlice[j]) })
+			sort.Slice(mapSlice, func(i, j int) bool { return getLen(mapSlice[i]) > getLen(mapSlice[j]) })
+		} else {
+			sort.Slice(numberSlice, func(i, j int) bool { return ToFloat64(numberSlice[i]) < ToFloat64(numberSlice[j]) })
+			sort.Strings(stringSlice)
+			sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[i].(time.Time).Before(timeSlice[j].(time.Time)) })
+			sort.Slice(csliceSlice, func(i, j int) bool { return getLen(csliceSlice[i]) < getLen(csliceSlice[j]) })
+			sort.Slice(mapSlice, func(i, j int) bool { return getLen(mapSlice[i]) < getLen(mapSlice[j]) })
+		}
+
+		if sa.Subslices {
+			if sa.Emptyslices {
+				outputSlice = append(outputSlice, numberSlice, stringSlice, timeSlice, csliceSlice, mapSlice, defaultSlice)
+			} else {
+				if len(numberSlice) > 0 {
+					outputSlice = append(outputSlice, numberSlice)
+				}
+
+				if len(stringSlice) > 0 {
+					outputSlice = append(outputSlice, stringSlice)
+				}
+
+				if len(timeSlice) > 0 {
+					outputSlice = append(outputSlice, timeSlice)
+				}
+
+				if len(csliceSlice) > 0 {
+					outputSlice = append(outputSlice, csliceSlice)
+				}
+
+				if len(mapSlice) > 0 {
+					outputSlice = append(outputSlice, mapSlice)
+				}
+
+				if len(defaultSlice) > 0 {
+					outputSlice = append(outputSlice, defaultSlice)
+				}
+			}
+		} else {
+			for _, v := range numberSlice {
+				outputSlice = append(outputSlice, v)
+			}
+
+			for _, v := range stringSlice {
+				outputSlice = append(outputSlice, v)
+			}
+
+			for _, v := range defaultSlice {
+				outputSlice = append(outputSlice, v)
+			}
+
+			for _, v := range timeSlice {
+				outputSlice = append(outputSlice, v)
+			}
+
+			for _, v := range csliceSlice {
+				outputSlice = append(outputSlice, v)
+			}
+
+			for _, v := range mapSlice {
+				outputSlice = append(outputSlice, v)
+			}
+		}
+
+		return outputSlice, nil
 	default:
 		return "", errors.New("Too many args.")
 	}
+}
 
-	return "", nil
+func getLen(from interface{}) int {
+	v := reflect.ValueOf(from)
+	switch v.Kind() {
+	case reflect.Slice:
+		return v.Len()
+	case reflect.Map:
+		return v.Len()
+	default:
+		return 0
+	}
 }
 
 func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, error) {
