@@ -1397,13 +1397,13 @@ func (c *Context) tmplSort (slice []interface{}, sortargs ...interface{}) (inter
 		if sa.Reverse {
 			sort.Slice(numberSlice, func(i, j int) bool { return ToFloat64(numberSlice[i]) > ToFloat64(numberSlice[j]) })
 			sort.Slice(stringSlice, func(i, j int) bool { return getString(stringSlice[i]) > getString(stringSlice[j]) })
-			sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[j].(time.Time).Before(timeSlice[i].(time.Time)) })
+			sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[i].(time.Time).Before(timeSlice[j].(time.Time)) })
 			sort.Slice(csliceSlice, func(i, j int) bool { return getLen(csliceSlice[i]) > getLen(csliceSlice[j]) })
 			sort.Slice(mapSlice, func(i, j int) bool { return getLen(mapSlice[i]) > getLen(mapSlice[j]) })
 		} else {
 			sort.Slice(numberSlice, func(i, j int) bool { return ToFloat64(numberSlice[i]) < ToFloat64(numberSlice[j]) })
 			sort.Slice(stringSlice, func(i, j int) bool { return getString(stringSlice[i]) < getString(stringSlice[j]) })
-			sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[i].(time.Time).Before(timeSlice[j].(time.Time)) })
+			sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[j].(time.Time).Before(timeSlice[i].(time.Time)) })
 			sort.Slice(csliceSlice, func(i, j int) bool { return getLen(csliceSlice[i]) < getLen(csliceSlice[j]) })
 			sort.Slice(mapSlice, func(i, j int) bool { return getLen(mapSlice[i]) < getLen(mapSlice[j]) })
 		}
