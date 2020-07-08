@@ -1494,7 +1494,7 @@ func getString(from interface{}) string {
 }
 
 func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+	if c.IncreaseCheckCallCounterPremium("tibiaguild", 1, 3) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1556,7 +1556,7 @@ func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, erro
 }
 
 func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+	if c.IncreaseCheckCallCounterPremium("tibiaguildmembers", 1, 2) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1588,7 +1588,7 @@ func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{
 }
 
 func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 5, 15) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1677,7 +1677,48 @@ func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
 }
 
 func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 30) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 15) {
+		return "", ErrTooManyCalls
+	}
+
+	tibia, err := GetChar(char)
+	if err != nil {
+		if len(char) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else {
+		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+		if matched {
+			return "Esse char não existe.", err
+		}
+	}
+
+	mortes := tibia.Characters.Deaths
+	retorno := make([]map[string]interface{}, len(mortes))
+	if len(mortes) >= 1 {
+		for k, v := range mortes {
+			t2, err := dateparse.ParseLocal(v.Date.Date)
+			if err != nil {
+				return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
+			}
+			retorno[k] = map[string]interface{}{
+				"Level": v.Level,
+				"Motivo": v.Motivo,
+				"Data": (t2.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT"),
+			}
+		}
+		return retorno, nil
+	} else {
+		return "Esse char não tem mortes recentes.", nil
+	}
+
+	return "", nil
+}
+
+func (c *Context) tmplGetCharDeath(char string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 15) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1715,7 +1756,7 @@ func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
 }
 
 func (c *Context) tmplCheckWorld(mundo string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 5) {
+	if c.IncreaseCheckCallCounterPremium("tibiamundo", 1, 5) {
 		return "", ErrTooManyCalls
 	}
 
