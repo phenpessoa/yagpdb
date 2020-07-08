@@ -19,7 +19,7 @@ import (
 )
 
 func (p *Plugin) AddCommands() {
-	const msgIDDocs = "To get the id of a message you have to turn on developer mode in Discord's appearances settings then right click the message and copy id."
+	const msgIDDocs = "Para conseguir o ID de uma mensagem você deve ativar o modo desenvolvidor no discord. Feito isso, clique com o botão direito na mensagem e depois em copiar ID."
 
 	categoryRoleMenu := &dcmd.Category{
 		Name:        "Rolemenu",
@@ -32,7 +32,7 @@ func (p *Plugin) AddCommands() {
 		&commands.YAGCommand{
 			CmdCategory: commands.CategoryTool,
 			Name:        "Role",
-			Description: "Toggle a role on yourself or list all available roles, they have to be set up in the control panel first, under 'rolecommands' ",
+			Description: "Alterna um cargo em você ou lista todos os cargos disponíveis. Os cargos tem que ser configurados no painel de controle. ",
 			Arguments: []*dcmd.ArgDef{
 				&dcmd.ArgDef{Name: "Role", Type: dcmd.String},
 			},
@@ -169,7 +169,7 @@ func CmdFuncRole(parsed *dcmd.Data) (interface{}, error) {
 		if err == sql.ErrNoRows {
 			resp, err := CmdFuncListCommands(parsed)
 			if v, ok := resp.(string); ok {
-				return "Role not found, " + v, err
+				return "Não consegui encontrar o cargo, " + v, err
 			}
 
 			return resp, err
@@ -181,10 +181,10 @@ func CmdFuncRole(parsed *dcmd.Data) (interface{}, error) {
 	go analytics.RecordActiveUnit(parsed.GS.ID, &Plugin{}, "cmd_used")
 
 	if given {
-		return "Gave you the role!", nil
+		return "Te dei o cargo!", nil
 	}
 
-	return "Took away your role!", nil
+	return "Tirei o seu cargo!", nil
 }
 
 func HumanizeAssignError(guild *dstate.GuildState, err error) (string, error) {
@@ -200,15 +200,15 @@ func HumanizeAssignError(guild *dstate.GuildState, err error) (string, error) {
 
 	if code, msg := common.DiscordError(err); code != 0 {
 		if code == discordgo.ErrCodeMissingPermissions {
-			return "The bot is below the role, contact the server admin", err
+			return "O bot está abaixo desse cargo, fale com o administrador do servidor.", err
 		} else if code == discordgo.ErrCodeMissingAccess {
-			return "Bot does not have enough permissions to assign you this role, contact the server admin", err
+			return "O bot não tem permissão suficiente para te dar esse cargo, fale com o administrador do servidor", err
 		}
 
-		return "An error occured while assigning the role: " + msg, err
+		return "Ocorreu um erro ao tentar te dar o cargo: " + msg, err
 	}
 
-	return "An error occurred while assigning the role", err
+	return "Ocorreu um erro ao tentar te dar o cargo", err
 
 }
 
