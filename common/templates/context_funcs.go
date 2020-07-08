@@ -1705,7 +1705,7 @@ func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
 			}
 			retorno[k] = map[string]interface{}{
 				"Level": v.Level,
-				"Motivo": v.Motivo,
+				"Motivo": v.Reason,
 				"Data": (t2.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT"),
 			}
 		}
