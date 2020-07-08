@@ -32,6 +32,7 @@ func (p *Plugin) AddCommands() {
 		&commands.YAGCommand{
 			CmdCategory: commands.CategoryTool,
 			Name:        "Role",
+			Aliases:     []string{"cargo"},
 			Description: "Alterna um cargo em você ou lista todos os cargos disponíveis. Os cargos tem que ser configurados no painel de controle. ",
 			Arguments: []*dcmd.ArgDef{
 				&dcmd.ArgDef{Name: "Role", Type: dcmd.String},
