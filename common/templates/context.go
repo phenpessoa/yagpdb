@@ -539,6 +539,7 @@ func baseContextFuncs(c *Context) {
 
 	c.ContextFuncs["getChar"] = c.tmplGetTibiaChar
 	c.ContextFuncs["getDeaths"] = c.tmplGetCharDeaths
+	c.ContextFuncs["getDeath"] = c.tmplGetCharDeath
 	c.ContextFuncs["getGuild"] = c.tmplGetTibiaSpecificGuild
 	c.ContextFuncs["getGuildMembers"] = c.tmplGetTibiaSpecificGuildMembers
 	c.ContextFuncs["checkWorld"] = c.tmplCheckWorld
