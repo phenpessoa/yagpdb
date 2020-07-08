@@ -1588,7 +1588,7 @@ func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{
 }
 
 func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 5, 15) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 15) {
 		return "", ErrTooManyCalls
 	}
 
