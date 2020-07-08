@@ -227,7 +227,7 @@ var DeathsCommand = &commands.YAGCommand{
 					} else {
 						split := strings.Split(v.Reason, ",")
 						for i := range split {
-							checkOutros, _ := regexp.MatchString(`e outros.`, motivo)
+							checkOutros, _ := regexp.MatchString(`e outros.\z`, motivo)
 							if len(motivo) < 150 {
 								motivo += fmt.Sprintf("%s, ", split[i])
 							} else {
@@ -242,7 +242,7 @@ var DeathsCommand = &commands.YAGCommand{
 						motivo = ""
 					}
 				} else {
-					checkOutras, _ := regexp.MatchString(`... entre outras ...`, deaths)
+					checkOutras, _ := regexp.MatchString(`... entre outras ...\z`, deaths)
 					if !checkOutras {
 						deaths += "... entre outras ..."
 					}
@@ -303,7 +303,7 @@ var CheckOnlineCommand = &commands.YAGCommand{
 
 		if len(world.World.PlayersOnline) > 0 {
 			for _, v := range world.World.PlayersOnline {
-				checkEnd, _ := regexp.MatchString(`e outros.`, desc)
+				checkEnd, _ := regexp.MatchString(`e outros.\z`, desc)
 				if len(desc) < 1948 {
 					desc += fmt.Sprintf("%s, ", v.Name)
 				} else {
