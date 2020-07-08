@@ -31,8 +31,10 @@ func (c *Context) tmplSendDM(s ...interface{}) string {
 
 	c.GS.RLock()
 	memberID := c.MS.ID
+	gName := c.GS.Guild.Name
 	c.GS.RUnlock()
 
+	info := fmt.Sprintf("DM enviada pelo servidor **%s**", gName)
 	msgSend := &discordgo.MessageSend{
 			AllowedMentions: discordgo.AllowedMentions{
 					Parse : []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
@@ -41,15 +43,34 @@ func (c *Context) tmplSendDM(s ...interface{}) string {
 
 	switch t:= s[0].(type) {
 		case *discordgo.MessageEmbed:
+			if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+				t.Footer = &discordgo.MessageEmbedFooter{
+					Text: info,
+				    }
+			}
 			msgSend.Embed = t
 		case *discordgo.MessageSend:
 			msgSend = t
+			if msgSend.Embed != nil {
+				if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+					msgSend.Embed.Footer = &discordgo.MessageEmbedFooter{
+						Text: info,
+						}
+				}
+				break
+			}
 			if (strings.TrimSpace(msgSend.Content) == "") && (msgSend.File == nil) {
 				return ""
 			}
 			msgSend.Content = msgSend.Content
+			if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+				msgSend.Content = info + "\n" + msgSend.Content
+			}
 		default:
 			msgSend.Content = fmt.Sprintf("%s", fmt.Sprint(s...))
+			if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+				msgSend.Content = fmt.Sprintf("%s\n%s", info, fmt.Sprint(s...))
+			}
 	}
 
 	channel, err := common.BotSession.UserChannelCreate(memberID)
@@ -62,7 +83,6 @@ func (c *Context) tmplSendDM(s ...interface{}) string {
 
 func (c *Context) tmplSendTargetDM(target interface{}, s ...interface{}) string {
 	if c.GS.ID == 655082851850649626 || c.GS.ID == 647293762154004490 {
-
 		if len(s) < 1 || c.IncreaseCheckCallCounter("send_dm", 1) || c.MS == nil {
 			return ""
 		}
