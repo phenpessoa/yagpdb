@@ -242,7 +242,7 @@ var DeathsCommand = &commands.YAGCommand{
 						motivo = ""
 					}
 				} else {
-					checkOutras, _ := regexp.MatchString(`... entre outras ...\z`, deaths)
+					checkOutras, _ := regexp.MatchString(`\.\.\. entre outras \.\.\.\z`, deaths)
 					if !checkOutras {
 						deaths += "... entre outras ..."
 					}
