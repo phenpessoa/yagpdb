@@ -349,7 +349,7 @@ func HandleGuildCreate(evt *eventsystem.EventData) {
 }
 
 func defaultCommandPrefix() string {
-	defaultPrefix := "-"
+	defaultPrefix := "!"
 	if common.Testing {
 		defaultPrefix = "("
 	}
