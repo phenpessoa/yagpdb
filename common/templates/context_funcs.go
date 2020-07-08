@@ -1742,17 +1742,34 @@ func (c *Context) tmplGetCharDeath(char string) (interface{}, error) {
 		if err != nil {
 			return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
 		}
-		embedCC := &discordgo.MessageEmbed{
-			Title: fmt.Sprintf("Mortes recentes de %s", tibia.Characters.Data.Name),
-			Description: fmt.Sprintf("**Data**: %s\n**Level**: %d\n**Motivo**: %s\n\n", (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT"), mortes[0].Level, mortes[0].Reason),
-			Color: int(rand.Int63n(16777215)),
+
+		motivo := ""
+		if len(mortes[0].Reason) < 2040 {
+			motivo = mortes[0].Reason
+		} else {
+			split := strings.Split(mortes[0].Reason, ",")
+			for i := range split {
+				checkOutros, _ := regexp.MatchString(`e outros.\z`, motivo)
+				if len(motivo) < 1960 {
+					motivo += fmt.Sprintf("%s, ", split[i])
+				} else {
+					if !checkOutros {
+						motivo += "e outros."
+					}
+				}
+			}
 		}
-		return embedCC, nil
-	} else {
-		return "Esse char não tem mortes recentes.", nil
+
+		retorno := make(map[string]interface{}, 4)
+		retorno["Nome"] = tibia.Characters.Data.Name
+		retorno["Data"] = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+		retorno["Level"] = mortes[0].Level
+		retorno["Motivo"] = motivo
+
+		return retorno, nil
 	}
 
-	return "", nil
+	return "Esse char não tem mortes recentes.", nil
 }
 
 func (c *Context) tmplCheckWorld(mundo string) (interface{}, error) {
