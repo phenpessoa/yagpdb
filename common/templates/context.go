@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
-	"io/ioutil"
 	"net/http"
 	"encoding/json"
 
@@ -959,14 +958,9 @@ func GetChar(name ...string) (*Tibia, error) {
 		return nil, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	err = json.NewDecoder(resp.Body).Decode(&tibia)
 	if err != nil {
 		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &tibia)
-	if queryErr != nil {
-		return nil, queryErr
 	}
 
 	return &tibia, nil
@@ -992,14 +986,9 @@ func GetWorld(name ...string) (*TibiaWorld, error) {
 		return nil, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	err = json.NewDecoder(resp.Body).Decode(&world)
 	if err != nil {
 		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &world)
-	if queryErr != nil {
-		return nil, queryErr
 	}
 
 	return &world, nil
@@ -1025,13 +1014,8 @@ func GetNews(name string) (*TibiaNews, error) {
 		return nil, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	err = json.NewDecoder(resp.Body).Decode(&tibia)
 	if err != nil {
-		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &tibia)
-	if queryErr != nil {
 		return nil, err
 	}
 
@@ -1055,13 +1039,8 @@ func InsideNews(number int) (*TibiaSpecificNews, error) {
 		return nil, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	err = json.NewDecoder(resp.Body).Decode(&tibiaInside)
 	if err != nil {
-		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &tibiaInside)
-	if queryErr != nil {
 		return nil, err
 	}
 
@@ -1084,13 +1063,8 @@ func GetSpecificGuild(name string) (*SpecificGuild, error) {
 		return nil, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	err = json.NewDecoder(resp.Body).Decode(&specificGuild)
 	if err != nil {
-		return nil, err
-	}
-
-	queryErr := json.Unmarshal(body, &specificGuild)
-	if queryErr != nil {
 		return nil, err
 	}
 
