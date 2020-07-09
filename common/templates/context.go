@@ -536,12 +536,20 @@ func baseContextFuncs(c *Context) {
 
 	c.ContextFuncs["sort"] = c.tmplSort
 
-	c.ContextFuncs["getChar"] = c.tmplGetTibiaChar
-	c.ContextFuncs["getDeaths"] = c.tmplGetCharDeaths
-	c.ContextFuncs["getDeath"] = c.tmplGetCharDeath
-	c.ContextFuncs["getGuild"] = c.tmplGetTibiaSpecificGuild
-	c.ContextFuncs["getGuildMembers"] = c.tmplGetTibiaSpecificGuildMembers
-	c.ContextFuncs["checkWorld"] = c.tmplCheckWorld
+	//Tibia
+		//Chars
+			//Single
+				c.ContextFuncs["getChar"] = c.tmplGetTibiaChar
+				c.ContextFuncs["getDeaths"] = c.tmplGetCharDeaths
+				c.ContextFuncs["getDeath"] = c.tmplGetCharDeath
+			//Goroutine
+				c.ContextFuncs["getMultipleChars"] = c.tmplGetMultipleChars
+				c.ContextFuncs["getMultipleCharsDeath"] = c.tmplGetMultipleCharsDeath
+		//Guild
+			c.ContextFuncs["getGuild"] = c.tmplGetTibiaSpecificGuild
+			c.ContextFuncs["getGuildMembers"] = c.tmplGetTibiaSpecificGuildMembers
+		//Mundos
+			c.ContextFuncs["checkWorld"] = c.tmplCheckWorld
 }
 
 type limitedWriter struct {
