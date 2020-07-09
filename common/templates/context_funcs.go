@@ -1494,7 +1494,7 @@ func getString(from interface{}) string {
 }
 
 func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiaguild", 1, 3) {
+	if c.IncreaseCheckCallCounterPremium("tibiaguild", 1, 5) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1588,7 +1588,7 @@ func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{
 }
 
 func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 15) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 40) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1678,7 +1678,7 @@ func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
 }
 
 func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 15) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 40) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1719,7 +1719,7 @@ func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
 }
 
 func (c *Context) tmplGetCharDeath(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 15) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 40) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1774,7 +1774,7 @@ func (c *Context) tmplGetCharDeath(char string) (interface{}, error) {
 }
 
 func (c *Context) tmplCheckWorld(mundo string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiamundo", 1, 5) {
+	if c.IncreaseCheckCallCounterPremium("tibiamundo", 1, 10) {
 		return "", ErrTooManyCalls
 	}
 
