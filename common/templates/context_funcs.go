@@ -1657,7 +1657,7 @@ func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
 	}
 
 	m := make(map[string]interface{}, 16)
-	m["Nome"] = tibia.Character.Data.Name
+	m["Nome"] = tibia.Characters.Data.Name
 	m["Level"] = level
 	m["Mundo"] = tibia.Characters.Data.World
 	m["Vocação"] = tibia.Characters.Data.Vocation
