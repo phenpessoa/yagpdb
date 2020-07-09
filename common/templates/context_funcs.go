@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"sort"
 	"encoding/json"
+	"sync"
 
 	"github.com/jonas747/discordgo"
 	"github.com/jonas747/dstate"
@@ -1588,7 +1589,7 @@ func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{
 }
 
 func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 40) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 40) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1612,13 +1613,13 @@ func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
 	}
 
 	level := tibia.Characters.Data.Level
-		for _, v := range world.World.PlayersOnline {
-			if v.Name == tibia.Characters.Data.Name {
-				if v.Level > tibia.Characters.Data.Level {
-					level = v.Level
-				}
+	for _, v := range world.World.PlayersOnline {
+		if v.Name == tibia.Characters.Data.Name {
+			if v.Level > tibia.Characters.Data.Level {
+				level = v.Level
 			}
 		}
+	}
 
 	comentario := "Char sem comentário."
 	if len(tibia.Characters.Data.Comment) >= 1 {
@@ -1678,7 +1679,7 @@ func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
 }
 
 func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 40) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 40) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1719,7 +1720,7 @@ func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
 }
 
 func (c *Context) tmplGetCharDeath(char string) (interface{}, error) {
-	if c.IncreaseCheckCallCounterPremium("tibiachar", 2, 40) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 40) {
 		return "", ErrTooManyCalls
 	}
 
@@ -1788,4 +1789,247 @@ func (c *Context) tmplCheckWorld(mundo string) (interface{}, error) {
 	}
 
 	return false, nil
+}
+
+//Goroutine Stuff
+var wg sync.WaitGroup
+
+func (c *Context) tmplGetMultipleChars(chars interface{}) (interface{}, error) {
+	v := reflect.ValueOf(chars)
+	var slice []interface{}
+	switch v.Kind() {
+	case reflect.Slice:
+		if v.Len() > 40 {
+			return "", errors.New("você não pode solicitar mais do que 40 personagens de uma vez.")
+		} else {
+			switch t := chars.(type) {
+			case []interface{}:
+				slice = t
+			case Slice:
+				slice = t
+			default:
+				fmt.Println("seila porra")
+			}
+		}
+	default:
+		return nil, errors.New("Essa função só aceita slices como argumento.")
+	}
+
+	output, err := c.tmplGetTibiaMultiple(slice, false)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
+}
+
+func (c *Context) tmplGetMultipleCharsDeath(chars interface{}) (interface{}, error) {
+	v := reflect.ValueOf(chars)
+	var slice []interface{}
+	switch v.Kind() {
+	case reflect.Slice:
+		if v.Len() > 40 {
+			return "", errors.New("você não pode solicitar mais do que 40 personagens de uma vez.")
+		} else {
+			switch t := chars.(type) {
+			case []interface{}:
+				slice = t
+			case Slice:
+				slice = t
+			default:
+				fmt.Println("seila porra")
+			}
+		}
+	default:
+		return nil, errors.New("Essa função só aceita slices como argumento.")
+	}
+
+	output, err := c.tmplGetTibiaMultiple(slice, true)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
+}
+
+func (c *Context) tmplGetTibiaMultiple(chars []interface{}, deathsonly bool) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiagoroutine", 0, 1) {
+		return "", ErrTooManyCalls
+	}
+
+	fila := make(chan interface{}, 40)
+	if deathsonly {
+		for _, v := range chars {
+			wg.Add(1)
+			go deathRoutine(fila, v)
+		}
+	} else {
+		for _, v := range chars {
+			wg.Add(1)
+			go charRoutine(fila, v)
+		}
+	}
+	wg.Wait()
+	close (fila)
+
+	output := make([]interface{}, 0)
+	for e  := range fila {
+		output = append(output, e)
+	}
+
+	return output, nil
+}
+
+func deathRoutine(c chan interface{}, char interface{}) {
+	defer routineCleanUp()
+	switch t := char.(type) {
+	case string:
+		tibia, err := GetChar(t)
+		if err != nil {
+			if len(t) <= 0 {
+				c <- "Você tem que especificar um char."
+			} else {
+				c <- "Algo deu errado ao pesquisar esse char."
+			}
+		} else {
+			matched, _ := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+			if matched {
+				c <- "Esse char não existe."
+			} else {
+				mortes := tibia.Characters.Deaths
+				if len(mortes) >= 1 {
+					t, err := dateparse.ParseLocal(mortes[0].Date.Date)
+					if err != nil {
+						c <- "Algo deu errado ao pesquisar esse char, por causa da data de criação."
+					}
+
+					motivo := ""
+					if len(mortes[0].Reason) < 2040 {
+						motivo = mortes[0].Reason
+					} else {
+						split := strings.Split(mortes[0].Reason, ",")
+						for i := range split {
+							checkOutros, _ := regexp.MatchString(`e outros.\z`, motivo)
+							if len(motivo) < 1960 {
+								motivo += fmt.Sprintf("%s, ", split[i])
+							} else {
+								if !checkOutros {
+									motivo += "e outros."
+								}
+							}
+						}
+					}
+
+					retorno := make(map[string]interface{}, 4)
+					retorno["Nome"] = tibia.Characters.Data.Name
+					retorno["Data"] = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+					retorno["Level"] = mortes[0].Level
+					retorno["Motivo"] = motivo
+
+					c <- retorno
+				} else {
+					c <- "Esse char não possui mortes recentes."
+				}
+			}
+		}
+	default:
+		c <- "O char especificado não é valido."
+	}
+}
+
+func charRoutine(c chan interface{}, char interface{}) {
+	defer routineCleanUp()
+	switch t := char.(type) {
+	case string:
+		tibia, err := GetChar(t)
+		if err != nil {
+			if len(t) <= 0 {
+				c <- "Você tem que especificar um char."
+			} else {
+				c <- "Algo deu errado ao pesquisar esse char."
+			}
+		} else {
+			matched, _ := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+			if matched {
+				c <- "Esse char não existe."
+			} else {
+				world, err := GetWorld(tibia.Characters.Data.World)
+				if err != nil {
+					c <- "Algo deu errado com o mundo desse char."
+				} else {
+					level := tibia.Characters.Data.Level
+					for _, v := range world.World.PlayersOnline {
+						if v.Name == tibia.Characters.Data.Name {
+							if v.Level > tibia.Characters.Data.Level {
+								level = v.Level
+							}
+						}
+					}
+					comentario := "Char sem comentário."
+					if len(tibia.Characters.Data.Comment) >= 1 {
+						comentario = tibia.Characters.Data.Comment
+					}
+
+					lealdade := "Sem lealdade."
+					if len(tibia.Characters.AccountInformation.LoyaltyTitle) > 0 {
+						lealdade = tibia.Characters.AccountInformation.LoyaltyTitle
+					}
+
+					guild := "Sem guild."
+					cargo := "Sem guild."
+					if len(tibia.Characters.Data.Guild.Name) >= 1{
+						guild = tibia.Characters.Data.Guild.Name
+						cargo = tibia.Characters.Data.Guild.Rank
+					}
+
+					casado := "Ninguém."
+					if len(tibia.Characters.Data.MarriedTo) >= 1 {
+						casado = tibia.Characters.Data.MarriedTo
+					}
+
+					casa := "Nenhuma"
+					if len(tibia.Characters.Data.House.Name) >= 1 {
+						casa = tibia.Characters.Data.House.Name
+					}
+					criado := "Data escondida."
+					if len(tibia.Characters.AccountInformation.Created.Date) > 0 {
+						t, err := dateparse.ParseLocal(tibia.Characters.AccountInformation.Created.Date)
+						if err != nil {
+							c <- "Algo deu errado ao pesquisar esse char, por causa da data de criação."
+						}
+						criado = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+					}
+
+					m := make(map[string]interface{}, 16)
+					m["Nome"] = tibia.Characters.Data.Name
+					m["Level"] = level
+					m["Mundo"] = tibia.Characters.Data.World
+					m["Vocação"] = tibia.Characters.Data.Vocation
+					m["Templo"] = tibia.Characters.Data.Residence
+					m["Status"] = tibia.Characters.Data.AccountStatus
+					m["On/Off"] = strings.Title(tibia.Characters.Data.Status)
+					m["Lealdade"] = lealdade
+					m["Pontos de Achievement"] = tibia.Characters.Data.AchievementPoints
+					m["Gênero"] = strings.Title(tibia.Characters.Data.Sex)
+					m["Casado"] = casado
+					m["Guild"] = guild
+					m["Cargo na Guild"] = cargo
+					m["Comentário"] = comentario
+					m["Criado"] = criado
+					m["Casa"] = casa
+
+					c <- m
+				}
+			}
+		}
+	default:
+		c <- "O char especificado não é valido."
+	}
+}
+
+func routineCleanUp() {
+	if r := recover(); r != nil {
+		logger.Info(fmt.Sprintf("Recovered at: %s", r))
+	}
+	defer wg.Done()
 }
