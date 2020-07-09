@@ -938,27 +938,14 @@ func (ai *ActInfo) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func GetChar(name ...string) (*Tibia, error) {
+func GetChar(name string) (*Tibia, error) {
 	tibia := Tibia{}
-	queryUrl := ""
-
-	if len(name) >= 1 {
-		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/characters/%s.json", name[0])
-	}
-
-	req, err := http.NewRequest("GET", queryUrl, nil)
+	resp, err := MakeRequest(name, "char")
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "curl/7.65.1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&tibia)
+	err = json.NewDecoder(resp).Decode(&tibia)
 	if err != nil {
 		return nil, err
 	}
@@ -966,27 +953,14 @@ func GetChar(name ...string) (*Tibia, error) {
 	return &tibia, nil
 }
 
-func GetWorld(name ...string) (*TibiaWorld, error) {
+func GetWorld(name string) (*TibiaWorld, error) {
 	world := TibiaWorld{}
-	queryUrl := ""
-
-	if len(name) >= 1 {
-		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/world/%s.json", name[0])
-	}
-
-	req, err := http.NewRequest("GET", queryUrl, nil)
+	resp, err := MakeRequest(name, "w")
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "curl/7.65.1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&world)
+	err = json.NewDecoder(resp).Decode(&world)
 	if err != nil {
 		return nil, err
 	}
@@ -996,25 +970,17 @@ func GetWorld(name ...string) (*TibiaWorld, error) {
 
 func GetNews(name string) (*TibiaNews, error) {
 	tibia := TibiaNews{}
-	queryUrl := "https://api.tibiadata.com/v2/latestnews.json"
-
+	url := "tn"
 	if name == "ticker" {
-		queryUrl = "https://api.tibiadata.com/v2/newstickers.json"
+		url = "nt"
 	}
 
-	req, err := http.NewRequest("GET", queryUrl, nil)
+	resp, err := MakeRequest(name, url)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "curl/7.65.1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&tibia)
+	err = json.NewDecoder(resp).Decode(&tibia)
 	if err != nil {
 		return nil, err
 	}
@@ -1025,21 +991,12 @@ func GetNews(name string) (*TibiaNews, error) {
 
 func InsideNews(number int) (*TibiaSpecificNews, error) {
 	tibiaInside := TibiaSpecificNews{}
-	queryUrl := fmt.Sprintf("https://api.tibiadata.com/v2/news/%d.json", number)
-
-	req, err := http.NewRequest("GET", queryUrl, nil)
+	resp, err := MakeRequest(number, "")
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "curl/7.65.1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&tibiaInside)
+	err = json.NewDecoder(resp).Decode(&tibiaInside)
 	if err != nil {
 		return nil, err
 	}
@@ -1049,7 +1006,41 @@ func InsideNews(number int) (*TibiaSpecificNews, error) {
 
 func GetSpecificGuild(name string) (*SpecificGuild, error) {
 	specificGuild := SpecificGuild{}
-	queryUrl := fmt.Sprintf("https://api.tibiadata.com/v2/guild/%s.json", name)
+	resp, err := MakeRequest(name, "sg")
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.NewDecoder(resp).Decode(&specificGuild)
+	if err != nil {
+		return nil, err
+	}
+
+	return &specificGuild, nil
+}
+
+func MakeRequest(name interface{}, url string) (io.Reader, error) {
+	var queryUrl string
+	switch name.(type) {
+	case string:
+		if url == "sg" {
+			queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/guild/%s.json", name)
+		} else if url == "tsn" {
+			queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/guild/%s.json", name)
+		} else if url == "tn" {
+			queryUrl = "https://api.tibiadata.com/v2/latestnews.json"
+		} else if url == "nt" {
+			queryUrl = "https://api.tibiadata.com/v2/newstickers.json"
+		} else if url == "w" {
+			queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/world/%s.json", name)
+		} else {
+			queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/characters/%s.json", name)
+		}
+	case int, int64:
+		queryUrl = fmt.Sprintf("https://api.tibiadata.com/v2/news/%d.json", name)
+	default:
+		return nil, nil
+	}
 
 	req, err := http.NewRequest("GET", queryUrl, nil)
 	if err != nil {
@@ -1063,10 +1054,5 @@ func GetSpecificGuild(name string) (*SpecificGuild, error) {
 		return nil, err
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&specificGuild)
-	if err != nil {
-		return nil, err
-	}
-
-	return &specificGuild, nil
+	return resp.Body, nil
 }
