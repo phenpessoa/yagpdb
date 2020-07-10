@@ -9,12 +9,17 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"math/rand"
+	"sort"
+	"encoding/json"
+	"sync"
 
 	"github.com/jonas747/discordgo"
 	"github.com/jonas747/dstate"
 	"github.com/jonas747/yagpdb/bot"
 	"github.com/jonas747/yagpdb/common"
 	"github.com/jonas747/yagpdb/common/scheduledevents2"
+	"github.com/araddon/dateparse"
 )
 
 var ErrTooManyCalls = errors.New("Too many calls to this function")
@@ -26,25 +31,100 @@ func (c *Context) tmplSendDM(s ...interface{}) string {
 	}
 
 	c.GS.RLock()
-	gName := c.GS.Guild.Name
 	memberID := c.MS.ID
+	gName := c.GS.Guild.Name
 	c.GS.RUnlock()
 
-	info := fmt.Sprintf("Custom Command DM From the server **%s**", gName)
-
-	// Send embed
-	if embed, ok := s[0].(*discordgo.MessageEmbed); ok {
-		embed.Footer = &discordgo.MessageEmbedFooter{
-			Text: info,
+	info := fmt.Sprintf("DM enviada pelo servidor **%s**", gName)
+	msgSend := &discordgo.MessageSend{
+			AllowedMentions: discordgo.AllowedMentions{
+					Parse : []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
+			},
 		}
 
-		bot.SendDMEmbed(memberID, embed)
+	switch t:= s[0].(type) {
+		case *discordgo.MessageEmbed:
+			if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+				t.Footer = &discordgo.MessageEmbedFooter{
+					Text: info,
+				    }
+			}
+			msgSend.Embed = t
+		case *discordgo.MessageSend:
+			msgSend = t
+			if msgSend.Embed != nil {
+				if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+					msgSend.Embed.Footer = &discordgo.MessageEmbedFooter{
+						Text: info,
+						}
+				}
+				break
+			}
+			if (strings.TrimSpace(msgSend.Content) == "") && (msgSend.File == nil) {
+				return ""
+			}
+			msgSend.Content = msgSend.Content
+			if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+				msgSend.Content = info + "\n" + msgSend.Content
+			}
+		default:
+			msgSend.Content = fmt.Sprintf("%s", fmt.Sprint(s...))
+			if c.GS.ID != 655082851850649626 && c.GS.ID != 647293762154004490 {
+				msgSend.Content = fmt.Sprintf("%s\n%s", info, fmt.Sprint(s...))
+			}
+	}
+
+	channel, err := common.BotSession.UserChannelCreate(memberID)
+	if err != nil {
+		return ""
+	}
+	_, _ = common.BotSession.ChannelMessageSendComplex(channel.ID, msgSend)
+	return ""
+}
+
+func (c *Context) tmplSendTargetDM(target interface{}, s ...interface{}) string {
+	if c.GS.ID == 655082851850649626 || c.GS.ID == 647293762154004490 {
+		if len(s) < 1 || c.IncreaseCheckCallCounter("send_dm", 1) || c.MS == nil {
+			return ""
+		}
+
+		targetID := targetUserID(target)
+		if targetID == 0 {
+			return ""
+		}
+
+		ts, err := bot.GetMember(c.GS.ID, targetID)
+		if err != nil {
+			return ""
+		}
+
+		msgSend := &discordgo.MessageSend{
+				AllowedMentions: discordgo.AllowedMentions{
+						Parse : []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
+				},
+			}
+
+		switch t:= s[0].(type) {
+			case *discordgo.MessageEmbed:
+				msgSend.Embed = t
+			case *discordgo.MessageSend:
+				msgSend = t
+				if (strings.TrimSpace(msgSend.Content) == "") && (msgSend.File == nil) {
+					return ""
+				}
+				msgSend.Content = msgSend.Content
+			default:
+				msgSend.Content = fmt.Sprintf("%s", fmt.Sprint(s...))
+		}
+
+		channel, err := common.BotSession.UserChannelCreate(ts.ID)
+		if err != nil {
+			return ""
+		}
+		_, _ = common.BotSession.ChannelMessageSendComplex(channel.ID, msgSend)
 		return ""
 	}
 
-	msg := fmt.Sprint(s...)
-	msg = fmt.Sprintf("%s\n%s", info, msg)
-	bot.SendDM(memberID, msg)
 	return ""
 }
 
@@ -157,14 +237,18 @@ func (c *Context) ChannelArgNoDM(v interface{}) int64 {
 }
 
 func (c *Context) tmplSendTemplateDM(name string, data ...interface{}) (interface{}, error) {
-	return c.sendNestedTemplate(nil, true, name, data...)
+	return c.sendNestedTemplate(nil, true, false, name, data...)
 }
 
 func (c *Context) tmplSendTemplate(channel interface{}, name string, data ...interface{}) (interface{}, error) {
-	return c.sendNestedTemplate(channel, false, name, data...)
+	return c.sendNestedTemplate(channel, false, false, name, data...)
 }
 
-func (c *Context) sendNestedTemplate(channel interface{}, dm bool, name string, data ...interface{}) (interface{}, error) {
+func (c *Context) tmplExecTemplate(channel interface{}, name string, data ...interface{}) (interface{}, error) {
+	return c.sendNestedTemplate(channel, false, true, name, data...)
+}
+
+func (c *Context) sendNestedTemplate(channel interface{}, dm , exec bool, name string, data ...interface{}) (interface{}, error) {
 	if c.IncreaseCheckCallCounter("exec_child", 3) {
 		return "", ErrTooManyCalls
 	}
@@ -227,6 +311,7 @@ func (c *Context) sendNestedTemplate(channel interface{}, dm bool, name string, 
 		c.CurrentFrame.SendResponseInDM = oldFrame.SendResponseInDM
 	}
 
+	c.CurrentFrame.execMode = exec
 	// pass some data
 	if len(data) > 1 {
 		c.Data["TemplateArgs"], _ = Dictionary(data...)
@@ -241,6 +326,13 @@ func (c *Context) sendNestedTemplate(channel interface{}, dm bool, name string, 
 		return "", err
 	}
 
+	if exec {
+		var execReturnStruct CtxExecReturn
+		execReturnStruct.Response = c.MessageSend(resp)
+		execReturnStruct.Return = c.CurrentFrame.execReturn
+		return execReturnStruct, err
+	}
+
 	m, err := c.SendResponse(resp)
 	if err != nil {
 		return "", err
@@ -250,6 +342,19 @@ func (c *Context) sendNestedTemplate(channel interface{}, dm bool, name string, 
 		return m.ID, err
 	}
 	return "", err
+}
+
+func (c* Context) tmplAddReturn(data...interface{}) (interface{} ,error) {
+	if !c.CurrentFrame.isNestedTemplate || !c.CurrentFrame.execMode {
+		return "", errors.New("Can only be used in nested templates in exec mode.")
+	}
+
+	if len(c.CurrentFrame.execReturn) + len (data) > 10 {
+		return "", errors.New("Return length cannot exceed 10")
+	}
+
+	c.CurrentFrame.execReturn = append(c.CurrentFrame.execReturn, data...)
+	return "", nil
 }
 
 func (c *Context) tmplSendMessage(filterSpecialMentions bool, returnID bool) func(channel interface{}, msg interface{}) interface{} {
@@ -282,8 +387,8 @@ func (c *Context) tmplSendMessage(filterSpecialMentions bool, returnID bool) fun
 			msgSend.Embed = typedMsg
 		case *discordgo.MessageSend:
 			msgSend = typedMsg
-			msgSend.AllowedMentions = discordgo.AllowedMentions{
-				Parse: parseMentions,
+			if !filterSpecialMentions {
+				msgSend.AllowedMentions = discordgo.AllowedMentions{Parse: parseMentions,}
 			}
 		default:
 			msgSend.Content = fmt.Sprint(msg)
@@ -328,9 +433,16 @@ func (c *Context) tmplEditMessage(filterSpecialMentions bool) func(channel inter
 			}
 			msgEdit.Content = typedMsg.Content
 			msgEdit.Embed = typedMsg.Embed
+			msgEdit.AllowedMentions = typedMsg.AllowedMentions
 		default:
 			temp := fmt.Sprint(msg)
 			msgEdit.Content = &temp
+		}
+
+		if !filterSpecialMentions {
+			msgEdit.AllowedMentions = &discordgo.AllowedMentions {
+							Parse: []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers, discordgo.AllowedMentionTypeRoles, discordgo.AllowedMentionTypeEveryone},
+						  }
 		}
 
 		_, err = common.BotSession.ChannelMessageEditComplex(msgEdit)
@@ -785,19 +897,6 @@ func (c *Context) tmplRemoveRoleName(name string, optionalArgs ...interface{}) (
 	return "", nil
 }
 
-func (c *Context) findRoleByName(name string) *discordgo.Role {
-	c.GS.RLock()
-	defer c.GS.RUnlock()
-
-	for _, r := range c.GS.Guild.Roles {
-		if strings.EqualFold(r.Name, name) {
-			return r
-		}
-	}
-
-	return nil
-}
-
 func (c *Context) tmplDelResponse(args ...interface{}) string {
 	dur := 10
 	if len(args) > 0 {
@@ -914,7 +1013,7 @@ func (c *Context) tmplGetMessage(channel, msgID interface{}) (*discordgo.Message
 	return message, nil
 }
 
-func (c *Context) tmplGetMember(target interface{}) (*discordgo.Member, error) {
+func (c *Context) tmplGetMember(target interface{}) (*CtxMember, error) {
 	if c.IncreaseCheckGenericAPICall() {
 		return nil, ErrTooManyAPICalls
 	}
@@ -929,7 +1028,7 @@ func (c *Context) tmplGetMember(target interface{}) (*discordgo.Member, error) {
 		return nil, nil
 	}
 
-	return member.DGoCopy(), nil
+	return CtxMemberFromMS(member), nil
 }
 
 func (c *Context) tmplGetChannel(channel interface{}) (*CtxChannel, error) {
@@ -950,6 +1049,7 @@ func (c *Context) tmplGetChannel(channel interface{}) (*CtxChannel, error) {
 	}
 
 	return CtxChannelFromCS(cstate), nil
+
 }
 
 func (c *Context) tmplAddReactions(values ...reflect.Value) (reflect.Value, error) {
@@ -1218,4 +1318,695 @@ func (c *Context) tmplEditNickname(Nickname string) (string, error) {
 	}
 
 	return "", nil
+}
+
+type SortArgs struct {
+	Reverse		bool	`json:"reverse"`
+	Subslices	bool	`json:"subslices"`
+	Emptyslices	bool	`json:"emptyslices"`
+}
+
+func (c *Context) tmplSort (slice []interface{}, sortargs ...interface{}) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("sortfuncs", 1, 3) {
+		return "", ErrTooManyCalls
+	}
+
+	switch len(sortargs) {
+	case 0, 1:
+		var dict SDict
+		if len(sortargs) == 0 {
+			input := make(map[string]interface{}, 3)
+			input["reverse"] = false
+			input["subslices"] = false
+			input["emptyslices"] = false
+			sdict, err := StringKeyDictionary(input)
+			if err != nil {
+				return "", err
+			}
+			dict = sdict
+		} else {
+			sdict, err := StringKeyDictionary(sortargs[0])
+			if err != nil {
+				return "", err
+			}
+			dict = sdict
+		}
+		var sa SortArgs
+		encoded, err := json.Marshal(dict)
+		if err != nil {
+			return "", err
+		}
+		err = json.Unmarshal(encoded, &sa)
+		if err != nil {
+			return "", err
+		}
+
+		numberSlice := make([]interface{}, 0)
+		stringSlice := make([]interface{}, 0)
+		timeSlice := make([]interface{}, 0)
+		csliceSlice := make([]interface{}, 0)
+		mapSlice := make([]interface{}, 0)
+		defaultSlice := make([]interface{}, 0)
+		outputSlice := make([]interface{}, 0)
+
+		for _, v := range slice {
+			switch t := v.(type) {
+			case int, int64, float64:
+				numberSlice = append(numberSlice, t)
+			case string:
+				stringSlice = append(stringSlice, t)
+			case time.Time:
+				timeSlice = append(timeSlice, t)
+			case *time.Time:
+				timeSlice = append(timeSlice, *t)
+			default:
+				v := reflect.ValueOf(t)
+				switch v.Kind() {
+				case reflect.Slice:
+					csliceSlice = append(csliceSlice, t)
+				case reflect.Map:
+					mapSlice = append(mapSlice, t)
+				default:
+					defaultSlice = append(defaultSlice, t)
+				}
+			}
+		}
+
+		if sa.Reverse {
+			sort.Slice(numberSlice, func(i, j int) bool { return ToFloat64(numberSlice[i]) > ToFloat64(numberSlice[j]) })
+			sort.Slice(stringSlice, func(i, j int) bool { return getString(stringSlice[i]) > getString(stringSlice[j]) })
+			sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[i].(time.Time).Before(timeSlice[j].(time.Time)) })
+			sort.Slice(csliceSlice, func(i, j int) bool { return getLen(csliceSlice[i]) > getLen(csliceSlice[j]) })
+			sort.Slice(mapSlice, func(i, j int) bool { return getLen(mapSlice[i]) > getLen(mapSlice[j]) })
+		} else {
+			sort.Slice(numberSlice, func(i, j int) bool { return ToFloat64(numberSlice[i]) < ToFloat64(numberSlice[j]) })
+			sort.Slice(stringSlice, func(i, j int) bool { return getString(stringSlice[i]) < getString(stringSlice[j]) })
+			sort.Slice(timeSlice, func(i, j int) bool { return timeSlice[j].(time.Time).Before(timeSlice[i].(time.Time)) })
+			sort.Slice(csliceSlice, func(i, j int) bool { return getLen(csliceSlice[i]) < getLen(csliceSlice[j]) })
+			sort.Slice(mapSlice, func(i, j int) bool { return getLen(mapSlice[i]) < getLen(mapSlice[j]) })
+		}
+
+		if sa.Subslices {
+			if sa.Emptyslices {
+				outputSlice = append(outputSlice, numberSlice, stringSlice, timeSlice, csliceSlice, mapSlice, defaultSlice)
+			} else {
+				if len(numberSlice) > 0 {
+					outputSlice = append(outputSlice, numberSlice)
+				}
+
+				if len(stringSlice) > 0 {
+					outputSlice = append(outputSlice, stringSlice)
+				}
+
+				if len(timeSlice) > 0 {
+					outputSlice = append(outputSlice, timeSlice)
+				}
+
+				if len(csliceSlice) > 0 {
+					outputSlice = append(outputSlice, csliceSlice)
+				}
+
+				if len(mapSlice) > 0 {
+					outputSlice = append(outputSlice, mapSlice)
+				}
+
+				if len(defaultSlice) > 0 {
+					outputSlice = append(outputSlice, defaultSlice)
+				}
+			}
+		} else {
+			outputSlice = append(outputSlice, numberSlice...)
+			outputSlice = append(outputSlice, stringSlice...)
+			outputSlice = append(outputSlice, timeSlice...)
+			outputSlice = append(outputSlice, csliceSlice...)
+			outputSlice = append(outputSlice, mapSlice...)
+			outputSlice = append(outputSlice, defaultSlice...)
+		}
+
+		return outputSlice, nil
+	default:
+		return "", errors.New("Too many args.")
+	}
+}
+
+func getLen(from interface{}) int {
+	v := reflect.ValueOf(from)
+	switch v.Kind() {
+	case reflect.Slice:
+		return v.Len()
+	case reflect.Map:
+		return v.Len()
+	default:
+		return 0
+	}
+}
+
+func getString(from interface{}) string {
+	v := reflect.ValueOf(from)
+	switch v.Kind() {
+	case reflect.String:
+		return fmt.Sprintln(from)
+	default:
+		return ""
+	}
+}
+
+func (c *Context) tmplGetTibiaSpecificGuild(guildName string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiaguild", 1, 5) {
+		return "", ErrTooManyCalls
+	}
+
+	guild, err := GetSpecificGuild(guildName)
+	if err != nil {
+		if len(guildName) <= 0 {
+			return "Você tem que especificar uma guild.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else if len(guild.Guild.Error) >= 1 {
+		return "Essa guild não existe.", err
+	}
+
+	desc := "Guild sem descrição."
+	if len(guild.Guild.Data.Description) >= 1 && len(guild.Guild.Data.Description) < 2048 {
+		desc = guild.Guild.Data.Description
+	}
+
+	guildHall := "Nenhuma."
+	if len(guild.Guild.Data.Guildhall.Name) > 1 {
+		guildHall = fmt.Sprintf("**%s** que fica em %s", guild.Guild.Data.Guildhall.Name, guild.Guild.Data.Guildhall.Town)
+	}
+
+	guerra := "Não."
+	if guild.Guild.Data.War {
+		guerra = "Sim."
+	}
+
+	embedCC := &discordgo.MessageEmbed{
+		Title: guild.Guild.Data.Name,
+		Color: int(rand.Int63n(16777215)),
+		Description: desc,
+		Fields: []*discordgo.MessageEmbedField{
+			&discordgo.MessageEmbedField{
+				Name:   "Número de membros",
+				Value:  strconv.Itoa(guild.Guild.Data.Totalmembers),
+				Inline: true,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Mundo",
+				Value:  guild.Guild.Data.World,
+				Inline: true,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Guild Hall",
+				Value:  guildHall,
+				Inline: true,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Está em Guerra?",
+				Value:  guerra,
+				Inline: true,
+			},
+		},
+	}
+
+	return embedCC, nil
+}
+
+func (c *Context) tmplGetTibiaSpecificGuildMembers(guildName string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiaguildmembers", 1, 2) {
+		return "", ErrTooManyCalls
+	}
+
+	guild, err := GetSpecificGuild(guildName)
+	if err != nil {
+		if len(guildName) <= 0 {
+			return "Você tem que especificar uma guild.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else if len(guild.Guild.Error) >= 1 {
+		return "Essa guild não existe.", err
+	}
+
+	m := make([]map[string]interface{}, 0)
+	for _, tipo := range guild.Guild.Members {
+		for _, v := range tipo.Characters {
+			m = append(m, map[string]interface{}{
+				"Name": v.Name,
+				"Nick": v.Nick,
+				"Level": v.Level,
+				"Vocation": v.Vocation,
+				"Status": v.Status,
+			})
+		}
+	}
+
+	return m, nil
+}
+
+func (c *Context) tmplGetTibiaChar(char string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 40) {
+		return "", ErrTooManyCalls
+	}
+
+	tibia, err := GetChar(char)
+	if err != nil {
+		if len(char) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else {
+		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+		if matched {
+			return "Esse char não existe.", err
+		}
+	}
+
+	world, err := GetWorld(tibia.Characters.Data.World)
+	if err != nil {
+		return "Algo deu errado com o mundo desse char.", err
+	}
+
+	level := tibia.Characters.Data.Level
+	for _, v := range world.World.PlayersOnline {
+		if v.Name == tibia.Characters.Data.Name {
+			if v.Level > tibia.Characters.Data.Level {
+				level = v.Level
+			}
+		}
+	}
+
+	comentario := "Char sem comentário."
+	if len(tibia.Characters.Data.Comment) >= 1 {
+		comentario = tibia.Characters.Data.Comment
+	}
+
+	lealdade := "Sem lealdade."
+	if len(tibia.Characters.AccountInformation.LoyaltyTitle) > 0 {
+		lealdade = tibia.Characters.AccountInformation.LoyaltyTitle
+	}
+
+	guild := "Sem guild."
+	cargo := "Sem guild."
+	if len(tibia.Characters.Data.Guild.Name) >= 1{
+		guild = tibia.Characters.Data.Guild.Name
+		cargo = tibia.Characters.Data.Guild.Rank
+	}
+
+	casado := "Ninguém."
+	if len(tibia.Characters.Data.MarriedTo) >= 1 {
+		casado = tibia.Characters.Data.MarriedTo
+	}
+
+	casa := "Nenhuma"
+	if len(tibia.Characters.Data.House.Name) >= 1 {
+		casa = tibia.Characters.Data.House.Name
+	}
+
+	criado := "Data escondida."
+	if len(tibia.Characters.AccountInformation.Created.Date) > 0 {
+		t, err := dateparse.ParseLocal(tibia.Characters.AccountInformation.Created.Date)
+		if err != nil {
+			return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
+		}
+		criado = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+	}
+
+	m := make(map[string]interface{}, 16)
+	m["Nome"] = tibia.Characters.Data.Name
+	m["Level"] = level
+	m["Mundo"] = tibia.Characters.Data.World
+	m["Vocação"] = tibia.Characters.Data.Vocation
+	m["Templo"] = tibia.Characters.Data.Residence
+	m["Status"] = tibia.Characters.Data.AccountStatus
+	m["On/Off"] = strings.Title(tibia.Characters.Data.Status)
+	m["Lealdade"] = lealdade
+	m["Pontos de Achievement"] = tibia.Characters.Data.AchievementPoints
+	m["Gênero"] = strings.Title(tibia.Characters.Data.Sex)
+	m["Casado"] = casado
+	m["Guild"] = guild
+	m["Cargo na Guild"] = cargo
+	m["Comentário"] = comentario
+	m["Criado"] = criado
+	m["Casa"] = casa
+
+	return m, nil
+}
+
+func (c *Context) tmplGetCharDeaths(char string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 40) {
+		return "", ErrTooManyCalls
+	}
+
+	tibia, err := GetChar(char)
+	if err != nil {
+		if len(char) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else {
+		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+		if matched {
+			return "Esse char não existe.", err
+		}
+	}
+
+	mortes := tibia.Characters.Deaths
+	retorno := make([]map[string]interface{}, len(mortes))
+	if len(mortes) >= 1 {
+		for k, v := range mortes {
+			t2, err := dateparse.ParseLocal(v.Date.Date)
+			if err != nil {
+				return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
+			}
+			retorno[k] = map[string]interface{}{
+				"Level": v.Level,
+				"Motivo": v.Reason,
+				"Data": (t2.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT"),
+			}
+		}
+		return retorno, nil
+	} else {
+		return "Esse char não tem mortes recentes.", nil
+	}
+
+	return "", nil
+}
+
+func (c *Context) tmplGetCharDeath(char string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiachar", 10, 40) {
+		return "", ErrTooManyCalls
+	}
+
+	tibia, err := GetChar(char)
+	if err != nil {
+		if len(char) <= 0 {
+			return "Você tem que especificar um char.", err
+		} else {
+			return "Algo deu errado ao pesquisar esse char.", err
+		}
+	} else {
+		matched, err := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+		if matched {
+			return "Esse char não existe.", err
+		}
+	}
+
+	mortes := tibia.Characters.Deaths
+	if len(mortes) >= 1 {
+		t, err := dateparse.ParseLocal(mortes[0].Date.Date)
+		if err != nil {
+			return "Algo deu errado ao pesquisar esse char, por causa da data de criação.", err
+		}
+
+		motivo := ""
+		if len(mortes[0].Reason) < 2040 {
+			motivo = mortes[0].Reason
+		} else {
+			split := strings.Split(mortes[0].Reason, ",")
+			for i := range split {
+				checkOutros, _ := regexp.MatchString(`e outros.\z`, motivo)
+				if len(motivo) < 1960 {
+					motivo += fmt.Sprintf("%s, ", split[i])
+				} else {
+					if !checkOutros {
+						motivo += "e outros."
+					}
+				}
+			}
+		}
+
+		retorno := make(map[string]interface{}, 4)
+		retorno["Nome"] = tibia.Characters.Data.Name
+		retorno["Data"] = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+		retorno["Level"] = mortes[0].Level
+		retorno["Motivo"] = motivo
+
+		return retorno, nil
+	}
+
+	return "Esse char não tem mortes recentes.", nil
+}
+
+func (c *Context) tmplCheckWorld(mundo string) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiamundo", 1, 10) {
+		return "", ErrTooManyCalls
+	}
+
+	world, err := GetWorld(mundo)
+	if err != nil {
+		return false, nil
+	}
+
+	if len(world.World.WorldInformation.CreationDate) > 0 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+//Goroutine Stuff
+var wg sync.WaitGroup
+
+func (c *Context) tmplGetMultipleChars(chars interface{}) (interface{}, error) {
+	v := reflect.ValueOf(chars)
+	var slice []interface{}
+	switch v.Kind() {
+	case reflect.Slice:
+		if v.Len() > 40 {
+			return "", errors.New("você não pode solicitar mais do que 40 personagens de uma vez.")
+		} else {
+			switch t := chars.(type) {
+			case []interface{}:
+				slice = t
+			case Slice:
+				slice = t
+			default:
+				fmt.Println("seila porra")
+			}
+		}
+	default:
+		return nil, errors.New("Essa função só aceita slices como argumento.")
+	}
+
+	output, err := c.tmplGetTibiaMultiple(slice, false)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
+}
+
+func (c *Context) tmplGetMultipleCharsDeath(chars interface{}) (interface{}, error) {
+	v := reflect.ValueOf(chars)
+	var slice []interface{}
+	switch v.Kind() {
+	case reflect.Slice:
+		if v.Len() > 40 {
+			return "", errors.New("você não pode solicitar mais do que 40 personagens de uma vez.")
+		} else {
+			switch t := chars.(type) {
+			case []interface{}:
+				slice = t
+			case Slice:
+				slice = t
+			default:
+				fmt.Println("seila porra")
+			}
+		}
+	default:
+		return nil, errors.New("Essa função só aceita slices como argumento.")
+	}
+
+	output, err := c.tmplGetTibiaMultiple(slice, true)
+	if err != nil {
+		return "", err
+	}
+
+	return output, nil
+}
+
+func (c *Context) tmplGetTibiaMultiple(chars []interface{}, deathsonly bool) (interface{}, error) {
+	if c.IncreaseCheckCallCounterPremium("tibiagoroutine", 0, 1) {
+		return "", ErrTooManyCalls
+	}
+
+	fila := make(chan interface{}, 40)
+	if deathsonly {
+		for _, v := range chars {
+			wg.Add(1)
+			go deathRoutine(fila, v)
+		}
+	} else {
+		for _, v := range chars {
+			wg.Add(1)
+			go charRoutine(fila, v)
+		}
+	}
+	wg.Wait()
+	close (fila)
+
+	output := make([]interface{}, 0)
+	for e  := range fila {
+		output = append(output, e)
+	}
+
+	return output, nil
+}
+
+func deathRoutine(c chan interface{}, char interface{}) {
+	defer routineCleanUp()
+	switch t := char.(type) {
+	case string:
+		tibia, err := GetChar(t)
+		if err != nil {
+			if len(t) <= 0 {
+				c <- "Você tem que especificar um char."
+			} else {
+				c <- "Algo deu errado ao pesquisar esse char."
+			}
+		} else {
+			matched, _ := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+			if matched {
+				c <- "Esse char não existe."
+			} else {
+				mortes := tibia.Characters.Deaths
+				if len(mortes) >= 1 {
+					t, err := dateparse.ParseLocal(mortes[0].Date.Date)
+					if err != nil {
+						c <- "Algo deu errado ao pesquisar esse char, por causa da data de criação."
+					}
+
+					motivo := ""
+					if len(mortes[0].Reason) < 2040 {
+						motivo = mortes[0].Reason
+					} else {
+						split := strings.Split(mortes[0].Reason, ",")
+						for i := range split {
+							checkOutros, _ := regexp.MatchString(`e outros.\z`, motivo)
+							if len(motivo) < 1960 {
+								motivo += fmt.Sprintf("%s, ", split[i])
+							} else {
+								if !checkOutros {
+									motivo += "e outros."
+								}
+							}
+						}
+					}
+
+					retorno := make(map[string]interface{}, 4)
+					retorno["Nome"] = tibia.Characters.Data.Name
+					retorno["Data"] = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+					retorno["Level"] = mortes[0].Level
+					retorno["Motivo"] = motivo
+
+					c <- retorno
+				} else {
+					c <- "Esse char não possui mortes recentes."
+				}
+			}
+		}
+	default:
+		c <- "O char especificado não é valido."
+	}
+}
+
+func charRoutine(c chan interface{}, char interface{}) {
+	defer routineCleanUp()
+	switch t := char.(type) {
+	case string:
+		tibia, err := GetChar(t)
+		if err != nil {
+			if len(t) <= 0 {
+				c <- "Você tem que especificar um char."
+			} else {
+				c <- "Algo deu errado ao pesquisar esse char."
+			}
+		} else {
+			matched, _ := regexp.MatchString(`Character does not exist.`, tibia.Characters.Error)
+			if matched {
+				c <- "Esse char não existe."
+			} else {
+				world, err := GetWorld(tibia.Characters.Data.World)
+				if err != nil {
+					c <- "Algo deu errado com o mundo desse char."
+				} else {
+					level := tibia.Characters.Data.Level
+					for _, v := range world.World.PlayersOnline {
+						if v.Name == tibia.Characters.Data.Name {
+							if v.Level > tibia.Characters.Data.Level {
+								level = v.Level
+							}
+						}
+					}
+					comentario := "Char sem comentário."
+					if len(tibia.Characters.Data.Comment) >= 1 {
+						comentario = tibia.Characters.Data.Comment
+					}
+
+					lealdade := "Sem lealdade."
+					if len(tibia.Characters.AccountInformation.LoyaltyTitle) > 0 {
+						lealdade = tibia.Characters.AccountInformation.LoyaltyTitle
+					}
+
+					guild := "Sem guild."
+					cargo := "Sem guild."
+					if len(tibia.Characters.Data.Guild.Name) >= 1{
+						guild = tibia.Characters.Data.Guild.Name
+						cargo = tibia.Characters.Data.Guild.Rank
+					}
+
+					casado := "Ninguém."
+					if len(tibia.Characters.Data.MarriedTo) >= 1 {
+						casado = tibia.Characters.Data.MarriedTo
+					}
+
+					casa := "Nenhuma"
+					if len(tibia.Characters.Data.House.Name) >= 1 {
+						casa = tibia.Characters.Data.House.Name
+					}
+					criado := "Data escondida."
+					if len(tibia.Characters.AccountInformation.Created.Date) > 0 {
+						t, err := dateparse.ParseLocal(tibia.Characters.AccountInformation.Created.Date)
+						if err != nil {
+							c <- "Algo deu errado ao pesquisar esse char, por causa da data de criação."
+						}
+						criado = (t.Add(time.Hour * -5)).Format("02/01/2006 15:04:05 BRT")
+					}
+
+					m := make(map[string]interface{}, 16)
+					m["Nome"] = tibia.Characters.Data.Name
+					m["Level"] = level
+					m["Mundo"] = tibia.Characters.Data.World
+					m["Vocação"] = tibia.Characters.Data.Vocation
+					m["Templo"] = tibia.Characters.Data.Residence
+					m["Status"] = tibia.Characters.Data.AccountStatus
+					m["On/Off"] = strings.Title(tibia.Characters.Data.Status)
+					m["Lealdade"] = lealdade
+					m["Pontos de Achievement"] = tibia.Characters.Data.AchievementPoints
+					m["Gênero"] = strings.Title(tibia.Characters.Data.Sex)
+					m["Casado"] = casado
+					m["Guild"] = guild
+					m["Cargo na Guild"] = cargo
+					m["Comentário"] = comentario
+					m["Criado"] = criado
+					m["Casa"] = casa
+
+					c <- m
+				}
+			}
+		}
+	default:
+		c <- "O char especificado não é valido."
+	}
+}
+
+func routineCleanUp() {
+	if r := recover(); r != nil {
+		logger.Info(fmt.Sprintf("Recovered at: %s", r))
+	}
+	defer wg.Done()
 }

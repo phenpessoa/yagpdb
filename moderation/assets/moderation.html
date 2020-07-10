@@ -39,6 +39,11 @@ the punishment{{end}}
                             Warnings <span
                                 class="indicator indicator-{{if .ModConfig.WarnCommandsEnabled}}success{{else}}danger{{end}}"></span>
                         </a></li>
+                    <li class="nav-item"><a class="nav-link" href="#lockdown" aria-controls="lockdown" role="tab"
+                        data-toggle="tab">
+                        Lockdown <span
+                            class="indicator indicator-{{if .ModConfig.LockdownCmdEnabled}}success{{else}}danger{{end}}"></span>
+                    </a></li>
                 </ul>
                 <div class="tab-content">
                     <div role="tabpanel" class="tab-pane active" id="general">{{template "moderation_general" .}}</div>
@@ -46,6 +51,7 @@ the punishment{{end}}
                     <div role="tabpanel" class="tab-pane" id="kick">{{template "moderation_kick" .}}</div>
                     <div role="tabpanel" class="tab-pane" id="ban">{{template "moderation_ban" .}}</div>
                     <div role="tabpanel" class="tab-pane" id="warn">{{template "moderation_warn" .}}</div>
+                    <div role="tabpanel" class="tab-pane" id="lockdown">{{template "moderation_lockdown" .}}</div>
                 </div>
             </div>
         </div>
@@ -167,6 +173,7 @@ the punishment{{end}}
         <hr />
         {{checkbox "LogBans" "log-bans" "Log ban events not made through the bot" .ModConfig.LogBans}}
         <p>For the author and reason to show up when this is used you need to give the bot "audit log" permissions.</p>
+        <hr />
     </div>
 </div>
 {{end}}
@@ -323,16 +330,18 @@ the punishment{{end}}
     <li>You can ban using user ids (even if they left the server)</li>
     <li>You can put a duration on the bans</li>
 </ul>
-<p>Note that the bans themselves are on discord, to unban someone you need to go into your banlist on discord
-    and unban them.</p>
+<p>Note that the bans themselves are on discord. To unban someone you can run the unban command
+    <code>unban @user somereason</code> or <code> unban 1034924032 somereason</code> or go into
+    your banlist on discord and unban them.</p>
 <div class="row">
     <div class="col-sm">
-        {{checkbox "BanEnabled" "BanEnabled" "Enable the Ban command" .ModConfig.BanEnabled}}
+        {{checkbox "BanEnabled" "BanEnabled" "Enable the Ban/Unban commands" .ModConfig.BanEnabled}}
         <p>
-            <code>ban @user some reason</code><br />
+            <code>ban/unban @user some reason</code><br />
             Only users with ban permission can use this. (or with roles specified below)<br />
             The ban command will ban a user as well as sending a message that the user was banned in the
-            action channel.
+            action channel.The unban command unbans a banned user and optionally sends a message to the
+	    action channel.
         </p>
         <hr />
 
@@ -346,7 +355,7 @@ the punishment{{end}}
 
         {{checkbox "BanReasonOptional" "BanReasonOptional" "Make the <code>reason</code> optional" .ModConfig.BanReasonOptional}}
         <hr />
-        
+     
         <div class="form-group">
             <label>Default number of days of messages to delete while banning. Range 0 to 7.</label>
             <input type="number" name="DefaultBanDeleteDays.Int64" class="form-control"
@@ -417,6 +426,49 @@ the punishment{{end}}
     <div class="col">
         <a class="mb-1 mt-1 mr-1 modal-basic btn btn-info btn-sm" href="#clear-server-warnings-modal">Delete all
             warnings</a>
+    </div>
+</div>
+{{end}}
+
+{{define "moderation_lockdown"}}
+<p>Allows you to lock/unlock the everyone role, or any role specified.</p>
+<p>You have the ability to change these permissions: SendMessages, AddReactions, VoiceConnect, VoiceTalk</p>
+<div class="row">
+    <div class="col-sm">
+        {{checkbox "LockdownCmdEnabled" "lock-down-enabled" "Enable lockdown commands" .ModConfig.LockdownCmdEnabled}}
+        <p>People with manage roles permissions plus extra roles set below can use this.</p>
+        <p>Usage is, for example: <code>(prefix)lockdown "rolename" -all -d 6h</code></p>
+        <hr />
+        <div class="form-group">
+            <label>Users with the following roles will have permission to use the
+                <code>lockdown/lock and unlock</code> commands</label><br>
+            <select class="multiselect" name="LockdownCmdRoles" data-plugin-multiselect multiple="multiple">
+                {{roleOptionsMulti .ActiveGuild.Roles nil .ModConfig.LockdownCmdRoles}}
+            </select>
+        </div>
+        <hr />
+        <div class="form-group">
+            <label for="DefaultLockRole">Default Lock Role</label>
+            <select class="form-control" name="DefaultLockRole">
+                {{roleOptions .ActiveGuild.Roles .HighestRole .ModConfig.DefaultLockRole "@everyone"}}
+            </select>
+        </div>
+        <hr />
+    </div>
+
+    <div class="col-sm">
+        {{checkbox "LockdownCmdModlog" "lock-down-modlog" "Log <code>lockdown and unlock</code> to modlog?" .ModConfig.LockdownCmdModlog}}
+        <hr />
+        {{checkbox "LockIncludeChannelLogs" "LockIncludeChannelLogs" "Create message logs in the channel that the command was run in" .ModConfig.LockIncludeChannelLogs}}
+        <hr />
+        <div class="form-group">
+            <label>Default Lockdown duration in minutes. Set to 0 for infinite</label>
+            <input type="number" name="DefaultLockdownDuration.Int64" class="form-control"
+                value="{{.ModConfig.DefaultLockdownDuration.Int64}}">
+        </div>
+        <hr />
+        {{checkbox "LockHasResponse" "LockHasResponse" "Should the bot respond to the usage of the command?" .ModConfig.LockHasResponse}}
+        <hr />
     </div>
 </div>
 {{end}}

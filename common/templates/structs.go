@@ -70,3 +70,33 @@ func CtxChannelFromCSLocked(cs *dstate.ChannelState) *CtxChannel {
 
 	return ctxChannel
 }
+
+type CtxExecReturn struct {
+
+	Return 			[]interface{}
+	Response		*discordgo.MessageSend
+}
+
+func (c CtxExecReturn) String() string {
+	if c.Response != nil {
+		return c.Response.Content
+	}
+	return ""
+}
+
+type CtxMember struct {
+	*discordgo.Member
+	//extra fields from Member State
+	Status 	   dstate.PresenceStatus `json:"status"`
+	Activity   *dstate.LightGame     `json:"activity"`
+}
+
+func CtxMemberFromMS(ms *dstate.MemberState) *CtxMember {
+	ctxMember := &CtxMember{
+			Member: 	ms.DGoCopy(),
+			Status: 	ms.PresenceStatus,
+			Activity: 	ms.PresenceGame,
+	}
+
+	return ctxMember
+}

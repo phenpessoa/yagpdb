@@ -287,7 +287,7 @@ func (kick *KickUserEffect) UserSettings() []*SettingDef {
 func (kick *KickUserEffect) Apply(ctxData *TriggeredRuleData, settings interface{}) error {
 	settingsCast := settings.(*KickUserEffectData)
 
-	reason := "Automoderator:\n"
+	reason := "Moderador automático:\n"
 	if settingsCast.CustomReason != "" {
 		reason += settingsCast.CustomReason
 	} else {
@@ -357,7 +357,7 @@ func (ban *BanUserEffect) UserSettings() []*SettingDef {
 func (ban *BanUserEffect) Apply(ctxData *TriggeredRuleData, settings interface{}) error {
 	settingsCast := settings.(*BanUserEffectData)
 
-	reason := "Automoderator:\n"
+	reason := "Moderador automático:\n"
 	if settingsCast.CustomReason != "" {
 		reason += settingsCast.CustomReason
 	} else {
@@ -420,7 +420,7 @@ func (mute *MuteUserEffect) Description() (description string) {
 func (mute *MuteUserEffect) Apply(ctxData *TriggeredRuleData, settings interface{}) error {
 	settingsCast := settings.(*MuteUserEffectData)
 
-	reason := "Automoderator:\n"
+	reason := "Moderador automático:\n"
 	if settingsCast.CustomReason != "" {
 		reason += settingsCast.CustomReason
 	} else {
@@ -474,7 +474,7 @@ func (warn *WarnUserEffect) Description() (description string) {
 func (warn *WarnUserEffect) Apply(ctxData *TriggeredRuleData, settings interface{}) error {
 	settingsCast := settings.(*WarnUserEffectData)
 
-	reason := "Automoderator:\n"
+	reason := "Moderador automático:\n"
 	if settingsCast.CustomReason != "" {
 		reason += settingsCast.CustomReason
 	} else {
@@ -701,10 +701,10 @@ func (rf *RemoveRoleEffect) Description() (description string) {
 func (rf *RemoveRoleEffect) Apply(ctxData *TriggeredRuleData, settings interface{}) error {
 	settingsCast := settings.(*RemoveRoleEffectData)
 
-	if !common.ContainsInt64Slice(ctxData.MS.Roles, settingsCast.Role) {
+  if !common.ContainsInt64Slice(ctxData.MS.Roles, settingsCast.Role) {
 		return nil
 	}
-
+  
 	err := common.RemoveRoleDS(ctxData.MS, settingsCast.Role)
 	if err != nil {
 		if code, _ := common.DiscordError(err); code != 0 {

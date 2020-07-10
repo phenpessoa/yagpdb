@@ -59,8 +59,26 @@ func tmplUserArg(tmplCtx *templates.Context) interface{} {
 				if member != nil {
 					// Found member
 					return member.DGoUser(), nil
-				}
+                }
+            } else {
+                if strings.Contains(str, "#") {
+                    s := strings.Split(str, "#")
+                    id := int64(0)
+                    disc, _ := strconv.ParseInt(s[1], 10, 32)
+                    discNarrow := int32(disc)
+                    for _, r := range tmplCtx.GS.Members {
+                        if strings.EqualFold(r.Username, s[0]) && r.Discriminator == discNarrow {
+                            id = r.ID
+                            break
+                        }
+                    }
 
+                    member, _ := bot.GetMember(tmplCtx.GS.ID, id)
+                    if member != nil {
+                        // Found member
+                        return member.DGoUser(), nil
+                    }
+                }
 			}
 
 			// No more cases we can handle
@@ -247,6 +265,8 @@ func execCmd(tmplCtx *templates.Context, dryRun bool, m *discordgo.MessageCreate
 	case *discordgo.MessageEmbed:
 		return v, nil
 	case []*discordgo.MessageEmbed:
+		return v, nil
+	case []map[string]interface {}:
 		return v, nil
 	}
 
