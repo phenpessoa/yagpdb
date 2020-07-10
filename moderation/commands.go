@@ -567,7 +567,7 @@ var ModerationCommands = []*commands.YAGCommand{
 				filtered = true
 			}
 
-      // Check if set to break at a certain ID
+      			//Check if set to break at a certain ID
 			toID := int64(0)
 			if parsed.Switches["to"].Value != nil {
 				filtered = true
