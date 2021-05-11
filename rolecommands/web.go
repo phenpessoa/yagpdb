@@ -113,7 +113,7 @@ func (p *Plugin) InitWeb() {
 	subMux.Handle(pat.Post("/update_cmd"), web.ControllerPostHandler(HandleUpdateCommand, getIndexpPostHandler, FormCommand{}))
 	subMux.Handle(pat.Post("/remove_cmd"), web.ControllerPostHandler(HandleRemoveCommand, getIndexpPostHandler, nil))
 	subMux.Handle(pat.Post("/move_cmd"), web.ControllerPostHandler(HandleMoveCommand, getIndexpPostHandler, nil))
-	subMux.Handle(pat.Post("/drag_cmd"), web.ControllerPostHandler(HandleDragCommand, getIndexpPostHandler, nil))
+	subMux.Handle(pat.Post("/drag_cmds"), web.ControllerPostHandler(HandleDragCmds, getIndexpPostHandler, nil))
 	subMux.Handle(pat.Post("/delete_rolecmds"), web.ControllerPostHandler(HandleDeleteRoleCommands, getIndexpPostHandler, nil))
 
 	subMux.Handle(pat.Post("/new_group"), web.ControllerPostHandler(HandleNewGroup, getIndexpPostHandler, FormGroup{}))
@@ -122,15 +122,14 @@ func (p *Plugin) InitWeb() {
 }
 
 type DragCmdData struct {
-	OldIndex int   `json:"old_index"`
-	NewIndex int   `json:"new_index"`
-	ID       int64 `json:"id,string"`
+	Positions []int `json:"positions"`
+	ID        int64 `json:"id,string"`
 }
 
-func HandleDragCommand(w http.ResponseWriter, r *http.Request) (web.TemplateData, error) {
+func HandleDragCmds(w http.ResponseWriter, r *http.Request) (web.TemplateData, error) {
 	defer r.Body.Close()
-	incomeChange := DragCmdData{}
-	err := json.NewDecoder(r.Body).Decode(&incomeChange)
+	data := DragCmdData{}
+	err := json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +143,7 @@ func HandleDragCommand(w http.ResponseWriter, r *http.Request) (web.TemplateData
 
 	var targetCmd *models.RoleCommand
 	for _, v := range commands {
-		if v.ID == incomeChange.ID {
+		if v.ID == data.ID {
 			targetCmd = v
 			break
 		}
@@ -163,44 +162,25 @@ func HandleDragCommand(w http.ResponseWriter, r *http.Request) (web.TemplateData
 		}
 	}
 
+	if len(commandsInGroup) != len(data.Positions) {
+		return tmpl, errors.New("positions sent to drag role commands endpoint don't match data")
+	}
+
 	sort.Slice(commandsInGroup, RoleCommandsLessFunc(commandsInGroup))
 
-	isUp := incomeChange.OldIndex > incomeChange.NewIndex
-
-	// Move the position
-OUTER:
-	for i := 0; i < len(commandsInGroup); i++ {
-		v := commandsInGroup[i]
-		v.Position = int64(i)
-
-		if v.ID == targetCmd.ID {
-			v.Position = int64(incomeChange.NewIndex)
-			continue OUTER
+	// Index is the new position, while the value is the old position of the
+	// rolecommand. Example: let's say we have a slice of positions [0 1 2 3 4]
+	// at the start. If we drag the last role command to the first position, the
+	// positions are reordered to [4 0 1 2 3] - the first role command,
+	// originally at position 4, has its position set to 0, the second
+	// (originally at position 0) set to 1, and so on.
+	for newPos, oldPos := range data.Positions {
+		if oldPos < 0 || oldPos >= len(commandsInGroup) {
+			// invalid data
+			return tmpl, errors.New("positions sent out of range")
 		}
 
-		if isUp {
-			switch {
-			case i < incomeChange.NewIndex:
-				// nothing to do
-				continue OUTER
-			case i >= incomeChange.NewIndex && i < incomeChange.OldIndex:
-				v.Position++
-			case i > incomeChange.OldIndex:
-				// nothing to do
-				continue OUTER
-			}
-		} else {
-			switch {
-			case i > incomeChange.NewIndex:
-				// nothing to do
-				continue OUTER
-			case i <= incomeChange.NewIndex && i > incomeChange.OldIndex:
-				v.Position--
-			case i < incomeChange.OldIndex:
-				// nothing to do
-				continue OUTER
-			}
-		}
+		commandsInGroup[oldPos].Position = int64(newPos)
 	}
 
 	for _, v := range commandsInGroup {

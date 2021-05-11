@@ -822,11 +822,25 @@ function createDragnDrop(guildID) {
 		handle: '.role-handle',
 
 		onEnd: function (evt) {
-			if (evt.oldIndex == evt.newIndex) {
+			if (evt.oldIndex === evt.newIndex) {
 				return;
 			}
+	
+			const dataIDs = $(".role-command")
+				.map(function() {
+					return Number($(this).attr("data-id"));
+				})
+				.get();
 
-			createRequest("POST", "/manage/" + guildID + "/rolecommands/drag_cmd", {"old_index": evt.oldIndex, "new_index": evt.newIndex, "id": evt.item[0].value}, null);
+			// reset positions to be sequential
+			$(".role-command").each(function(index) {
+				$(this).attr("data-id", index.toString());
+			});
+
+			createRequest("POST", "/manage/" + guildID + "/rolecommands/drag_cmds", {
+				positions: dataIDs,
+				id: evt.item[0].value,
+			}, null);
 			showReorderedRolesPopup();
 		},
 	});
