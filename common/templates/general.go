@@ -695,6 +695,53 @@ func joinStrings(sep string, args ...interface{}) (string, error) {
 	return builder.String(), nil
 }
 
+func tmplSprintSprintln(printType string) func(input ...interface{}) (string, error) {
+	return func(input ...interface{}) (string, error) {
+		var finalLen int
+
+		for _, v := range input {
+			val := reflect.ValueOf(v)
+			switch val.Kind() {
+			case reflect.Chan, reflect.Array, reflect.Slice, reflect.Map, reflect.String:
+				finalLen += val.Len()
+			}
+
+			if finalLen > MaxStringLength {
+				return "", fmt.Errorf("string grew too big: %d (allowed is: %d)", finalLen, MaxStringLength)
+			}
+		}
+
+		switch printType {
+		case "sprint":
+			return fmt.Sprint(input...), nil
+		case "sprintln":
+			return fmt.Sprintln(input...), nil
+		case "sprintf":
+			return "", errors.New("sprintf called on tmplSprintSprintln should use tmplSprintf instead")
+		default:
+			return "", fmt.Errorf("unknown printType %s", printType)
+		}
+	}
+}
+
+func tmplSprintf(format string, input ...interface{}) (string, error) {
+	var finalLen int
+
+	for _, v := range input {
+		val := reflect.ValueOf(v)
+		switch val.Kind() {
+		case reflect.Chan, reflect.Array, reflect.Slice, reflect.Map, reflect.String:
+			finalLen += val.Len()
+		}
+
+		if finalLen > MaxStringLength {
+			return "", fmt.Errorf("string grew too big: %d (allowed is: %d)", finalLen, MaxStringLength)
+		}
+	}
+
+	return fmt.Sprintf(format, input...), nil
+}
+
 func sequence(start, stop int) ([]int, error) {
 
 	if stop < start {
