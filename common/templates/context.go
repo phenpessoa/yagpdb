@@ -44,9 +44,9 @@ var (
 		"title":     strings.Title,
 		"hasPrefix": strings.HasPrefix,
 		"hasSuffix": strings.HasSuffix,
-		"print":     tmplSprintSprintln("sprint"),
-		"println":   tmplSprintSprintln("sprintln"),
-		"printf":    tmplSprintf,
+		"print":     withOutputLimit(fmt.Sprint, MaxStringLength),
+		"println":   withOutputLimit(fmt.Sprintln, MaxStringLength),
+		"printf":    withOutputLimitf(fmt.Sprintf, MaxStringLength),
 
 		// math
 		"add":               add,
