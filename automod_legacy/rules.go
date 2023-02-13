@@ -250,7 +250,7 @@ func CheckMessageForBadInvites(msg string, guildID int64) (containsBadInvites bo
 		return true
 	}
 
-	matches := common.DiscordInviteSource.Regex.FindAllStringSubmatch(msg, -1)
+	matches := common.InvitesInString(msg)
 	if len(matches) < 1 {
 		return false
 	}
@@ -288,13 +288,7 @@ func CheckMessageForBadInvites(msg string, guildID int64) (containsBadInvites bo
 	// in case it repeats in the message multiple times.
 	checked := make(map[string]bool, len(matches))
 
-	for _, v := range matches {
-		if len(v) < 3 {
-			continue
-		}
-
-		id := v[2]
-
+	for _, id := range matches {
 		// only check each link once
 		if checked[id] {
 			continue
